@@ -1,8 +1,7 @@
-import { Handshake, Leaf, MapPinned, Sprout } from "lucide-react";
-import { BrandName } from "@/components/brand-name";
+import { StoryPageContent } from "@/components/story-page-content";
 
 export const metadata = { title: "Our Story" };
 
 export default function OurStoryPage() {
-  return <main><section className="story-hero"><div className="site-container"><p className="eyebrow">Our Story</p><h1>Built to make agricultural trade feel closer, clearer and more useful.</h1><p><BrandName /> connects farm needs and opportunities in one marketplace designed for Nepal.</p></div></section><section className="story-copy"><div className="site-container story-grid"><div><p className="eyebrow">Why <BrandName /> exists</p><h2>A marketplace shaped around real agricultural needs.</h2></div><div><p>Farmers, households and agricultural businesses often have to search across many disconnected channels to find produce, equipment, services and dependable information. <BrandName /> brings those needs together in one organised marketplace.</p><p>The first stage is managed directly by <BrandName />. As the platform grows, approved farmers and independent agricultural businesses will be able to join through a verified seller system.</p></div></div></section><section className="milestone-section" id="projects"><div className="site-container"><div className="section-heading"><div><p className="eyebrow">What we are building</p><h2>Progress that can be seen and measured.</h2></div></div><div className="milestone-grid"><article><Sprout /><strong>Curated marketplace</strong><p>A useful starting catalogue across produce, equipment and services.</p></article><article><MapPinned /><strong>Selected-district delivery</strong><p>A manageable fulfilment model that can expand with operations.</p></article><article><Handshake /><strong>Future seller network</strong><p>Verified farmers and businesses with clear approvals and settlements.</p></article><article><Leaf /><strong>Ongoing collaboration</strong><p>Projects, achievements and partnerships managed from the admin panel.</p></article></div></div></section></main>;
+  return <main><StoryPageContent /></main>;
 }

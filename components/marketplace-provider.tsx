@@ -49,6 +49,8 @@ type MarketplaceContextValue = {
   listingsReady: boolean;
   listingsLive: boolean;
   refreshListings: () => Promise<void>;
+  profilePhoto: string | null;
+  setProfilePhoto: (photo: string | null) => void;
 };
 
 const MarketplaceContext = createContext<MarketplaceContextValue | null>(null);
@@ -83,6 +85,7 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
   const [marketplaceListings, setMarketplaceListings] = useState<Listing[]>(fallbackListings);
   const [listingsReady, setListingsReady] = useState(false);
   const [listingsLive, setListingsLive] = useState(false);
+  const [profilePhoto, setProfilePhotoState] = useState<string | null>(null);
 
   const refreshMarketplace = useCallback(async () => {
     const supabase = createClient();
@@ -140,7 +143,12 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
         .eq("is_active", true)
         .order("sort_order", { ascending: true }),
     ]);
-    const publicImageUrl = (path: string) => supabase.storage.from("marketplace-media").getPublicUrl(path).data.publicUrl;
+    // Site-local image paths (starting with "/") are served from /public directly;
+    // everything else is treated as a marketplace-media storage object path.
+    const publicImageUrl = (path: string) =>
+      path.startsWith("/")
+        ? path
+        : supabase.storage.from("marketplace-media").getPublicUrl(path).data.publicUrl;
     setMarketplaceListings(buildListings(
       listingRows,
       rows,
@@ -201,6 +209,7 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
         })) as CartLine[];
         setWishlist(new Set(savedWishlist));
         setCart(savedCart);
+        setProfilePhotoState(localStorage.getItem("khete-profile-photo"));
       } catch {
         localStorage.removeItem("khete-wishlist");
         localStorage.removeItem("khete-cart");
@@ -509,8 +518,20 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
     return { ok: true };
   }, []);
 
+  const setProfilePhoto = useCallback((photo: string | null) => {
+    setProfilePhotoState(photo);
+    try {
+      if (photo) localStorage.setItem("khete-profile-photo", photo);
+      else localStorage.removeItem("khete-profile-photo");
+    } catch {
+      // Photo is kept in memory even if local storage is full.
+    }
+  }, []);
+
   const value = useMemo(
     () => ({
+      profilePhoto,
+      setProfilePhoto,
       searchQuery,
       setSearchQuery,
       loginOpen,
@@ -542,6 +563,8 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
       refreshListings,
     }),
     [
+      profilePhoto,
+      setProfilePhoto,
       searchQuery,
       loginOpen,
       visibleWishlist,

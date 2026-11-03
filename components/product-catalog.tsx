@@ -149,7 +149,7 @@ export function ProductCatalog({ dealsOnly = false, servicesOnly = false }: { de
               <span>{filtered.length} listings</span>
             </div>
             <div className="catalog-results-scroll">
-              <div className="product-grid">{filtered.slice(0, visibleCount).map((listing) => <ProductCard key={listing.id} listing={listing} />)}</div>
+              <div className="product-grid">{filtered.slice(0, visibleCount).map((listing) => <ProductCard key={listing.id} listing={listing} serviceCta={servicesOnly} />)}</div>
               {!filtered.length ? <div className="empty-state"><h3>No listings match these filters</h3><button className="secondary-button" type="button" onClick={resetFilters}>Reset filters</button></div> : null}
               <div ref={sentinel} className="load-sentinel" aria-hidden="true" />
             </div>

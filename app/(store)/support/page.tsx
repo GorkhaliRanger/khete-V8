@@ -322,7 +322,6 @@ export default function SupportPage() {
             <h1>Support for every part of your <BrandName /> journey.</h1>
             <p>Contact us about products, orders, payments, delivery, custom requests, farmer or business applications, returns, and replacements.</p>
           </div>
-          <div className="support-trust"><ShieldCheck /><span><strong>One central support team</strong><small>Your request, files, and replies stay together under one reference.</small></span></div>
         </div>
       </section>
 

@@ -139,6 +139,20 @@ export function labelOrderStatus(status: OrderStatus) {
   return status.split("_").map((word) => word[0].toUpperCase() + word.slice(1)).join(" ");
 }
 
+/* Orders that have not been processed at all: received, but not yet moving through fulfilment. */
+export const pendingOrderStatuses: OrderStatus[] = ["pending_payment", "payment_review", "confirmed"];
+
+/* How long a pending order may sit unprocessed before it is flagged overdue. */
+export const pendingOrderOverdueMs = 24 * 60 * 60 * 1000;
+
+export function isPendingOrder(status: OrderStatus) {
+  return pendingOrderStatuses.includes(status);
+}
+
+export function isOverduePendingOrder(placedAt: string, now = Date.now()) {
+  return now - new Date(placedAt).getTime() > pendingOrderOverdueMs;
+}
+
 export function labelPaymentStatus(status: PaymentStatus) {
   return status.split("_").map((word) => word[0].toUpperCase() + word.slice(1)).join(" ");
 }

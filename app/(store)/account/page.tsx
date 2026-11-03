@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, BriefcaseBusiness, CalendarClock, FileText, Heart, LoaderCircle, LogOut, MapPin, PackageCheck, RotateCcw, ShoppingBag, Star, UserRound } from "lucide-react";
@@ -23,7 +23,8 @@ const accountSections = [
 
 export default function AccountPage() {
   const router = useRouter();
-  const { user, authReady, openLogin, signOut, wishlist, wishlistReady } = useMarketplace();
+  const { user, authReady, openLogin, signOut, wishlist, wishlistReady, profilePhoto, setProfilePhoto } = useMarketplace();
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState("");
@@ -106,6 +107,28 @@ export default function AccountPage() {
     };
   }, [user]);
 
+  const handlePhotoFile = async (file: File) => {
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new Error("read failed"));
+      reader.readAsDataURL(file);
+    });
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const element = new Image();
+      element.onload = () => resolve(element);
+      element.onerror = () => reject(new Error("invalid image"));
+      element.src = dataUrl;
+    });
+    const size = 256;
+    const scale = Math.min(1, size / Math.max(image.width, image.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.width * scale));
+    canvas.height = Math.max(1, Math.round(image.height * scale));
+    canvas.getContext("2d")?.drawImage(image, 0, 0, canvas.width, canvas.height);
+    setProfilePhoto(canvas.toDataURL("image/jpeg", 0.85));
+  };
+
   if (!authReady) {
     return <main className="simple-page"><div className="site-container account-loading">Loading your account…</div></main>;
   }
@@ -131,7 +154,16 @@ export default function AccountPage() {
     <main className="account-page">
       <div className="site-container">
         <section className="account-hero">
-          <div className="account-avatar" aria-hidden="true"><UserRound /></div>
+          <div className="account-avatar-wrap">
+            <div className="account-avatar" aria-hidden={profilePhoto ? undefined : true}>
+              {profilePhoto ? <img className="account-avatar-img" src={profilePhoto} alt="Your profile photo" /> : <UserRound />}
+            </div>
+            <div className="account-avatar-actions">
+              <button className="account-avatar-edit" type="button" onClick={() => photoInputRef.current?.click()}>{profilePhoto ? "Change photo" : "Add photo"}</button>
+              {profilePhoto ? <button className="account-avatar-remove" type="button" onClick={() => setProfilePhoto(null)}>Remove</button> : null}
+            </div>
+            <input ref={photoInputRef} type="file" accept="image/*" className="sr-only" aria-label="Upload profile photo" onChange={(event) => { const file = event.target.files?.[0]; if (file) void handlePhotoFile(file); event.target.value = ""; }} />
+          </div>
           <div>
             <p className="eyebrow">Customer account</p>
             <h1>{fullName}</h1>

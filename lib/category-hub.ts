@@ -18,6 +18,7 @@ export type CategoryHubResponse = {
   selectedCategory: HubCategory;
   subcategories: HubCategory[];
   products: Listing[];
+  pinnedSlug: string | null;
   pagination: {
     page: number;
     pageSize: number;

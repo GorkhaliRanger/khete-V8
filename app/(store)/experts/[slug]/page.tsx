@@ -23,6 +23,16 @@ export default async function ExpertProfilePage({ params }: { params: Promise<{ 
   if (!data) notFound();
   const expert = data as unknown as ProfessionalProfile;
   const initials = professionalInitials(expert.name);
+  const { data: relatedData } = await supabase
+    .from("professional_profiles")
+    .select(professionalProfileSelect)
+    .eq("status", "active")
+    .eq("role", expert.role)
+    .neq("id", expert.id)
+    .order("featured", { ascending: false })
+    .order("sort_order", { ascending: true })
+    .limit(4);
+  const related = (relatedData ?? []) as unknown as ProfessionalProfile[];
 
   return (
     <main className="expert-profile-page">
@@ -49,6 +59,35 @@ export default async function ExpertProfilePage({ params }: { params: Promise<{ 
         </div>
         <EntityCertificates targetType="profile" targetId={expert.id} />
         <PublicReviews targetType="professional" targetId={expert.id} />
+        {related.length ? (
+          <section className="related-professionals" aria-label="More professionals you may like">
+            <header>
+              <p className="eyebrow">{expert.role === "advisor" ? "More advisors you may like" : expert.role === "expert_professional" ? "More experts you may like" : "More partners you may like"}</p>
+              <h2>Other verified {expert.role === "advisor" ? "advisors" : expert.role === "expert_professional" ? "expert professionals" : "partners"}</h2>
+            </header>
+            <div className="related-professionals-grid">
+              {related.map((item) => {
+                const itemInitials = professionalInitials(item.name);
+                return (
+                  <Link className="related-professional-card" href={`/experts/${item.slug}`} key={item.id}>
+                    <span
+                      className={`related-professional-photo ${item.profile_image_url ? "has-image" : ""} ${item.role === "associate_partner" ? "brand-image" : ""}`}
+                      style={item.profile_image_url ? { backgroundImage: `url("${item.profile_image_url}")` } : undefined}
+                    >
+                      {!item.profile_image_url ? item.role === "associate_partner" ? <Building2 /> : itemInitials : null}
+                    </span>
+                    <span className="related-professional-info">
+                      <small><BadgeCheck /> {labelProfessionalRole(item.role)}</small>
+                      <strong>{item.name}</strong>
+                      <em>{item.position_title}</em>
+                      <span className="expert-profile-meta"><MapPin /> {item.location}</span>
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
       </div>
     </main>
   );

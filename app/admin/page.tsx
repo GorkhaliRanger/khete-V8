@@ -25,6 +25,7 @@ import {
 import { AdminAccessCard, type AdminAccessState } from "@/components/admin-access-card";
 import { AdminSidebar } from "@/components/admin-sidebar";
 import { formatNpr } from "@/data/marketplace";
+import { isOverduePendingOrder, isPendingOrder, type OrderStatus } from "@/lib/orders";
 import { createClient } from "@/lib/supabase/client";
 
 const adminRoles = new Set([
@@ -42,6 +43,8 @@ type DashboardData = {
   lowStock: number;
   orders: number;
   openOrders: number;
+  pendingOrders: number;
+  overduePendingOrders: number;
   grossOrderValue: number;
   paidRevenue: number;
   pendingCollection: number;
@@ -66,6 +69,8 @@ const emptyDashboard: DashboardData = {
   lowStock: 0,
   orders: 0,
   openOrders: 0,
+  pendingOrders: 0,
+  overduePendingOrders: 0,
   grossOrderValue: 0,
   paidRevenue: 0,
   pendingCollection: 0,
@@ -139,7 +144,7 @@ export default function AdminPage() {
         safe("Inventory", supabase.from("inventory").select("quantity,reserved_quantity,low_stock_threshold")),
         safe("Orders", supabase.from("orders").select("id", { count: "exact", head: true })),
         safe("Open orders", supabase.from("orders").select("id", { count: "exact", head: true }).in("status", ["pending_payment", "confirmed", "processing", "ready_for_dispatch", "shipped", "out_for_delivery"])),
-        safe("Order finance", supabase.from("orders").select("total,status,payment_status")),
+        safe("Order finance", supabase.from("orders").select("total,status,payment_status,placed_at")),
         safe("Support", supabase.from("support_tickets").select("id", { count: "exact", head: true }).in("status", ["open", "in_progress", "awaiting_customer"])),
         safe("Reviews", supabase.from("marketplace_reviews").select("id", { count: "exact", head: true }).in("status", ["pending", "changes_requested"])),
         safe("Applications", supabase.from("professional_applications").select("id", { count: "exact", head: true }).in("status", ["submitted", "under_review", "changes_requested"])),
@@ -151,7 +156,7 @@ export default function AdminPage() {
       ]);
 
       const inventoryRows = (inventory.data ?? []) as Array<{ quantity: number; reserved_quantity: number; low_stock_threshold: number }>;
-      const orderFinanceRows = (orderFinance.data ?? []) as Array<{ total: number; status: string; payment_status: string }>;
+      const orderFinanceRows = (orderFinance.data ?? []) as Array<{ total: number; status: string; payment_status: string; placed_at: string }>;
       const professionalFinanceRows = (professionalFinance.data ?? []) as Array<{
         gross_amount: number;
         platform_commission: number;
@@ -160,6 +165,7 @@ export default function AdminPage() {
         earning_status: string;
       }>;
       const activeOrderRows = orderFinanceRows.filter((item) => item.status !== "cancelled");
+      const pendingOrderRows = orderFinanceRows.filter((item) => isPendingOrder(item.status as OrderStatus));
       const activeProfessionalRows = professionalFinanceRows.filter(
         (item) => !["cancelled", "refunded"].includes(item.activity_status) && item.earning_status !== "reversed",
       );
@@ -169,6 +175,8 @@ export default function AdminPage() {
         lowStock: inventoryRows.filter((item) => Number(item.quantity) - Number(item.reserved_quantity) <= Number(item.low_stock_threshold)).length,
         orders: orders.count,
         openOrders: openOrders.count,
+        pendingOrders: pendingOrderRows.length,
+        overduePendingOrders: pendingOrderRows.filter((item) => isOverduePendingOrder(item.placed_at)).length,
         grossOrderValue: activeOrderRows.reduce((sum, item) => sum + Number(item.total), 0),
         paidRevenue: activeOrderRows.filter((item) => item.payment_status === "paid").reduce((sum, item) => sum + Number(item.total), 0),
         pendingCollection: activeOrderRows.filter((item) => ["unpaid", "pending"].includes(item.payment_status)).reduce((sum, item) => sum + Number(item.total), 0),
@@ -229,7 +237,7 @@ export default function AdminPage() {
   }, [loadDashboard]);
 
   const attentionCount = useMemo(
-    () => data.openOrders + data.lowStock + data.openSupport + data.pendingReviews + data.pendingApplications,
+    () => data.overduePendingOrders + data.lowStock + data.openSupport + data.pendingReviews + data.pendingApplications,
     [data],
   );
 
@@ -242,7 +250,7 @@ export default function AdminPage() {
       <AdminSidebar active="dashboard" />
       <section className="admin-main">
         <header className="admin-page-heading admin-dashboard-heading">
-          <div><p className="eyebrow">Marketplace control centre</p><h1>Dashboard</h1><p>See what needs attention across orders, inventory, customers, professionals, finance and trust.</p></div>
+          <div><p className="eyebrow">Marketplace control centre</p><h1>Dashboard</h1></div>
           <button type="button" onClick={() => void loadDashboard()} disabled={loading}>{loading ? <LoaderCircle className="admin-spinner" /> : <RefreshCw />} Refresh dashboard</button>
         </header>
 
@@ -262,7 +270,7 @@ export default function AdminPage() {
             <strong>{attentionCount}</strong>
             <p>
               {attentionCount > 0
-                ? "Open orders, low-stock records, support requests, reviews or professional applications require action."
+                ? `${data.overduePendingOrders ? `${data.overduePendingOrders} order${data.overduePendingOrders === 1 ? " is" : "s are"} overdue processing, plus ` : ""}low-stock records, support requests, reviews or professional applications require action.`
                 : "There are no open operational items requiring action right now."}
             </p>
           </div>
@@ -274,8 +282,9 @@ export default function AdminPage() {
 
         <section className="admin-dashboard-kpis">
           <Link href="/admin/orders"><ShoppingBag /><span><small>All orders</small><strong>{data.orders}</strong><em>{data.openOrders} open</em></span><ChevronRight /></Link>
+          <Link className={data.overduePendingOrders > 0 ? "admin-dashboard-kpi-alert" : ""} href="/admin/orders?view=pending"><Clock3 /><span><small>Pending orders</small><strong>{data.pendingOrders}</strong><em>{data.overduePendingOrders > 0 ? `${data.overduePendingOrders} overdue — needs attention` : "Awaiting processing"}</em></span><ChevronRight /></Link>
           <Link href="/admin/listings"><Package /><span><small>Listings</small><strong>{data.listings}</strong><em>{data.publishedListings} published</em></span><ChevronRight /></Link>
-          <Link className={data.lowStock > 0 ? "admin-dashboard-kpi-alert" : ""} href="/admin/listings#inventory"><Boxes /><span><small>Low stock</small><strong>{data.lowStock}</strong><em>{data.lowStock > 0 ? "Needs review" : "Stock levels healthy"}</em></span><ChevronRight /></Link>
+          <Link className={data.lowStock > 0 ? "admin-dashboard-kpi-alert" : ""} href="/admin/listings?focus=lowstock"><Boxes /><span><small>Low stock</small><strong>{data.lowStock}</strong><em>{data.lowStock > 0 ? "Needs review" : "Stock levels healthy"}</em></span><ChevronRight /></Link>
           <Link className={data.openSupport > 0 ? "admin-dashboard-kpi-alert" : ""} href="/admin/support"><Headphones /><span><small>Support</small><strong>{data.openSupport}</strong><em>{data.openSupport > 0 ? "Open work" : "No open requests"}</em></span><ChevronRight /></Link>
           <Link className={data.pendingReviews > 0 ? "admin-dashboard-kpi-alert" : ""} href="/admin/reviews"><Star /><span><small>Reviews</small><strong>{data.pendingReviews}</strong><em>{data.pendingReviews > 0 ? "Awaiting moderation" : "No pending reviews"}</em></span><ChevronRight /></Link>
           <Link className={data.pendingApplications > 0 ? "admin-dashboard-kpi-alert" : ""} href="/admin/network"><UsersRound /><span><small>Applications</small><strong>{data.pendingApplications}</strong><em>{data.pendingApplications > 0 ? "Needs review" : `${data.activeProfessionals} active profiles`}</em></span><ChevronRight /></Link>

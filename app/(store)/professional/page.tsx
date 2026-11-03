@@ -24,6 +24,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { BrandName } from "@/components/brand-name";
+import { ProfessionalCredentials } from "@/components/professional-credentials";
 import { useMarketplace } from "@/components/marketplace-provider";
 import { formatNpr } from "@/data/marketplace";
 import {
@@ -53,7 +54,7 @@ import {
 } from "@/lib/professional-services";
 import { createClient } from "@/lib/supabase/client";
 
-type DashboardTab = "requests" | "activity" | "payouts" | "offerings";
+type DashboardTab = "requests" | "activity" | "payouts" | "offerings" | "credentials";
 type StatusFilter = "all" | ProfessionalEarningStatus;
 
 const earningFilters: StatusFilter[] = [
@@ -413,7 +414,23 @@ export default function ProfessionalDashboardPage() {
           <button className={tab === "offerings" ? "active" : ""} type="button" onClick={() => setTab("offerings")}>
             <FileText /> Products & services
           </button>
+          <button className={tab === "credentials" ? "active" : ""} type="button" onClick={() => setTab("credentials")}>
+            <ShieldCheck /> Credentials
+          </button>
         </div>
+
+        {tab === "credentials" ? (
+          <section className="professional-dashboard-panel">
+            <header>
+              <div>
+                <p className="eyebrow">Verification</p>
+                <h2>Certificates & documents</h2>
+              </div>
+              <span>Private until published by khetE</span>
+            </header>
+            <ProfessionalCredentials profileId={profileId} />
+          </section>
+        ) : null}
 
         {tab === "requests" ? (
           <section className="professional-dashboard-panel">

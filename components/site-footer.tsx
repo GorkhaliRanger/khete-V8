@@ -12,9 +12,11 @@ const groups = [
 export function SiteFooter() {
   return (
     <footer className="site-footer" id="contact">
-      <div className="site-container footer-newsletter">
-        <div><p className="eyebrow">Stay close to the field</p><h2>Useful offers and agricultural updates.</h2></div>
-        <form onSubmit={(event) => event.preventDefault()}><label className="sr-only" htmlFor="newsletter-email">Email address</label><input id="newsletter-email" type="email" placeholder="Your email address" /><button type="submit" aria-label="Subscribe"><ArrowRight /></button></form>
+      <div className="footer-newsletter-band">
+        <div className="site-container footer-newsletter">
+          <div><p className="eyebrow">Stay close to the field</p><h2>Useful offers and agricultural updates.</h2></div>
+          <form onSubmit={(event) => event.preventDefault()}><label className="sr-only" htmlFor="newsletter-email">Email address</label><input id="newsletter-email" type="email" placeholder="Your email address" /><button type="submit"><span>Subscribe</span><ArrowRight /></button></form>
+        </div>
       </div>
       <div className="site-container footer-grid">
         <div className="footer-brand">

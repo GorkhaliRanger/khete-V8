@@ -73,7 +73,6 @@ export const supportTypesRequiringReference = new Set<SupportTicketType>([
   "delivery_issue",
   "return_request",
   "payment_issue",
-  "custom_request",
 ]);
 
 export const supportTopicOptions: {

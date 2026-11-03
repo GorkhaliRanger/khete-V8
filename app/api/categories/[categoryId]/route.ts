@@ -115,11 +115,59 @@ export async function GET(
       supabase.storage.from("marketplace-media").getPublicUrl(path).data.publicUrl;
     const total = count ?? 0;
 
+    let products = buildListings(listingRows, rows, imageRows, publicImageUrl, variantRows);
+
+    // Homepage highlight deep-link: /shop/<category>?pin=<listing-slug> shows the
+    // pinned product first, then the rest of the category.
+    const pinSlug = request.nextUrl.searchParams.get("pin");
+    let pinnedSlug: string | null = null;
+    if (pinSlug && page === 1) {
+      let pinnedRow = listingRows.find((row) => row.slug === pinSlug);
+      if (!pinnedRow) {
+        const { data: pinData } = await supabase
+          .from("listings")
+          .select(listingSelect)
+          .in("category_id", productCategoryIds)
+          .eq("status", "active")
+          .eq("slug", pinSlug)
+          .maybeSingle();
+        pinnedRow = (pinData as unknown as ListingRow | null) ?? undefined;
+        if (pinnedRow) {
+          const [{ data: pinImages }, { data: pinVariants }] = await Promise.all([
+            supabase
+              .from("listing_images")
+              .select("id,listing_id,storage_path,alt_text_en,alt_text_ne,sort_order,is_primary")
+              .eq("listing_id", pinnedRow.id)
+              .order("is_primary", { ascending: false })
+              .order("sort_order", { ascending: true }),
+            supabase
+              .from("listing_variants")
+              .select(listingVariantSelect)
+              .eq("listing_id", pinnedRow.id)
+              .eq("is_active", true)
+              .order("sort_order", { ascending: true }),
+          ]);
+          const pinnedListing = buildListings(
+            [pinnedRow],
+            rows,
+            (pinImages ?? []) as unknown as ListingImageRow[],
+            publicImageUrl,
+            (pinVariants ?? []) as unknown as ListingVariantRow[],
+          )[0];
+          if (pinnedListing) products = [pinnedListing, ...products];
+        }
+      } else {
+        products = [...products].sort((a, b) => (a.slug === pinSlug ? -1 : b.slug === pinSlug ? 1 : 0));
+      }
+      if (products[0]?.slug === pinSlug) pinnedSlug = pinSlug;
+    }
+
     return NextResponse.json({
       category: toHubCategory(requestedCategory),
       selectedCategory: toHubCategory(selectedCategory),
       subcategories: descendants.map(toHubCategory),
-      products: buildListings(listingRows, rows, imageRows, publicImageUrl, variantRows),
+      products,
+      pinnedSlug,
       pagination: {
         page,
         pageSize,

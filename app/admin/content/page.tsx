@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BookOpenCheck, Clock3, Eye, FilePenLine, LoaderCircle, RefreshCw, Save, Send, X } from "lucide-react";
+import { BookOpenCheck, Clock3, Eye, FilePenLine, LoaderCircle, Megaphone, RefreshCw, Save, Send, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminAccessCard, type AdminAccessState } from "@/components/admin-access-card";
 import { AdminSidebar } from "@/components/admin-sidebar";
@@ -16,6 +16,14 @@ import {
   type SitePolicyStatus,
 } from "@/lib/site-policies";
 import { createClient } from "@/lib/supabase/client";
+import {
+  STORY_MARQUEE_DEFAULT_EN,
+  STORY_MARQUEE_DEFAULT_NE,
+  STORY_MARQUEE_KEY,
+  siteContentError,
+  siteContentSelect,
+  type SiteContentRow,
+} from "@/lib/site-content";
 
 const contentRoles = new Set(["super_admin", "content_promotion_manager"]);
 
@@ -35,6 +43,44 @@ export default function AdminContentPage() {
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [marquee, setMarquee] = useState({ value_en: STORY_MARQUEE_DEFAULT_EN, value_ne: STORY_MARQUEE_DEFAULT_NE });
+  const [marqueeSaving, setMarqueeSaving] = useState(false);
+  const [marqueeNotice, setMarqueeNotice] = useState("");
+
+  const loadMarquee = useCallback(async () => {
+    const supabase = createClient();
+    const { data } = await supabase.from("site_content").select(siteContentSelect).eq("key", STORY_MARQUEE_KEY).maybeSingle();
+    const row = data as unknown as SiteContentRow | null;
+    setMarquee({
+      value_en: row?.value_en?.trim() || STORY_MARQUEE_DEFAULT_EN,
+      value_ne: row?.value_ne?.trim() || STORY_MARQUEE_DEFAULT_NE,
+    });
+  }, []);
+
+  async function saveMarquee() {
+    if (!marquee.value_en.trim()) {
+      setError("The English marquee text cannot be empty.");
+      return;
+    }
+    setMarqueeSaving(true);
+    setError("");
+    setMarqueeNotice("");
+    const supabase = createClient();
+    const { error: saveError } = await supabase
+      .from("site_content")
+      .upsert({
+        key: STORY_MARQUEE_KEY,
+        value_en: marquee.value_en.trim(),
+        value_ne: marquee.value_ne.trim() || null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "key" });
+    setMarqueeSaving(false);
+    if (saveError) {
+      setError(siteContentError(saveError));
+      return;
+    }
+    setMarqueeNotice("Story marquee updated — it is live on the Our Story page.");
+  }
 
   const loadDocuments = useCallback(async () => {
     const supabase = createClient();
@@ -89,6 +135,7 @@ export default function AdminContentPage() {
         setUserId(authData.user.id);
         setAccess("allowed");
         await loadDocuments();
+        await loadMarquee();
       } catch (caught) {
         if (!mounted) return;
         setError(sitePolicyError(caught));
@@ -97,7 +144,7 @@ export default function AdminContentPage() {
     };
     void checkAccess();
     return () => { mounted = false; };
-  }, [loadDocuments]);
+  }, [loadDocuments, loadMarquee]);
 
   useEffect(() => {
     if (!selected?.id) return;
@@ -179,6 +226,19 @@ export default function AdminContentPage() {
           <BookOpenCheck />
           <div><strong>Review before launch</strong><p>These are editable operational templates, not a substitute for legal advice. Have the final wording reviewed for your registered business, products, delivery model and payment methods.</p></div>
         </div>
+
+        <section className="admin-marquee-editor">
+          <header>
+            <div><p className="eyebrow">Homepage text</p><h2><Megaphone /> Story page marquee</h2><p>The slim scrolling line at the very top of the Our Story page. Keep it short — one sentence works best.</p></div>
+            <button className="primary-button" type="button" onClick={() => void saveMarquee()} disabled={marqueeSaving}>{marqueeSaving ? <LoaderCircle className="admin-spinner" /> : <Save />} Save marquee</button>
+          </header>
+          <div className="form-grid">
+            <label>English text<input value={marquee.value_en} onChange={(event) => setMarquee((current) => ({ ...current, value_en: event.target.value }))} maxLength={220} /></label>
+            <label className="np">नेपाली text<input className="np" value={marquee.value_ne} onChange={(event) => setMarquee((current) => ({ ...current, value_ne: event.target.value }))} maxLength={220} /></label>
+          </div>
+          {marqueeNotice ? <div className="admin-notice">{marqueeNotice}<button type="button" onClick={() => setMarqueeNotice("")}><X /></button></div> : null}
+        </section>
+
         {notice ? <div className="admin-notice">{notice}<button type="button" onClick={() => setNotice("")}><X /></button></div> : null}
         {error ? <div className="admin-notice admin-error-notice">{error}<button type="button" onClick={() => setError("")}><X /></button></div> : null}
 

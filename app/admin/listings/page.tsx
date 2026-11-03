@@ -2,7 +2,7 @@
 /* eslint-disable @next/next/no-img-element -- Admin previews must show the exact standardized master file. */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, Archive, BadgePercent, Boxes, CheckCircle2, ImagePlus, PackagePlus, Plus, Save, Star, Trash2, X } from "lucide-react";
+import { AlertCircle, Archive, BadgePercent, Boxes, CheckCircle2, ImagePlus, PackagePlus, Plus, Save, Search, Star, Trash2, X } from "lucide-react";
 import { AdminSidebar } from "@/components/admin-sidebar";
 import { categoryLevelLabel, categorySelect, type CategoryRow } from "@/lib/categories";
 import { listingSelect, listingVariantSelect, slugifyListing, type ListingImageRow, type ListingRow, type ListingStatus, type ListingVariantRow } from "@/lib/listings";
@@ -62,6 +62,7 @@ type AdminListing = {
   quantity: string;
   reservedQuantity: string;
   lowStockThreshold: string;
+  hasInventory: boolean;
   allowBackorder: boolean;
   images: AdminListingImage[];
   variants: AdminListingVariant[];
@@ -180,6 +181,7 @@ function fromRow(row: ListingRow, categories: CategoryRow[], inventory?: Invento
     quantity: inventory ? String(inventory.quantity) : "0",
     reservedQuantity: inventory ? String(inventory.reserved_quantity) : "0",
     lowStockThreshold: inventory ? String(inventory.low_stock_threshold) : "0",
+    hasInventory: Boolean(inventory),
     allowBackorder: inventory?.allow_backorder ?? false,
     images,
     variants: variants.filter((variant) => variant.listing_id === row.id).map(fromVariantRow),
@@ -217,6 +219,7 @@ function emptyListing(): AdminListing {
     quantity: "0",
     reservedQuantity: "0",
     lowStockThreshold: "0",
+    hasInventory: false,
     allowBackorder: false,
     images: [],
     variants: [],
@@ -237,6 +240,13 @@ export default function AdminListingsPage() {
   const [saving, setSaving] = useState(false);
   const [pendingImages, setPendingImages] = useState<{ file: File; previewUrl: string }[]>([]);
   const [feedback, setFeedback] = useState<ListingFeedback | null>(null);
+  const [listQuery, setListQuery] = useState("");
+  const [lowStockOnly, setLowStockOnly] = useState(false);
+  const [hoverPreview, setHoverPreview] = useState<{ name: string; url: string; x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("focus") === "lowstock") setLowStockOnly(true);
+  }, []);
 
   const loadCatalogue = useCallback(async () => {
     const supabase = createClient();
@@ -308,6 +318,23 @@ export default function AdminListingsPage() {
       return [item.id, [grandparent?.name_en, parent?.name_en, item.name_en].filter(Boolean).join(" › ")];
     }));
   }, [categories]);
+
+  // Mirrors the dashboard low-stock count exactly: an inventory row whose
+  // available quantity (quantity minus reserved) is at or below its threshold.
+  function isLowStockListing(item: AdminListing) {
+    return item.hasInventory && Number(item.quantity) - Number(item.reservedQuantity) <= Number(item.lowStockThreshold);
+  }
+
+  const lowStockCount = useMemo(() => items.filter(isLowStockListing).length, [items]);
+
+  const visibleItems = useMemo(() => {
+    const needle = listQuery.trim().toLowerCase();
+    return items.filter((item) => {
+      if (lowStockOnly && !isLowStockListing(item)) return false;
+      if (!needle) return true;
+      return [item.nameEn, item.nameNe, item.sku, item.slug, categoryLabels.get(item.categoryId) ?? ""].some((value) => value.toLowerCase().includes(needle));
+    });
+  }, [items, listQuery, lowStockOnly, categoryLabels]);
 
   const parentCategoryOptions = useMemo(() => categories.filter((item) => item.is_active && item.level === 0).map((item) => ({
     value: item.id,
@@ -746,8 +773,26 @@ export default function AdminListingsPage() {
         {error ? <div className="admin-notice admin-error-notice">{error}<button type="button" onClick={() => setError("")}><X /></button></div> : null}
         <div className="admin-listing-layout">
           <section className="listing-list-panel">
-            <div className="panel-heading"><div><h2>Catalogue</h2><span>{items.length} records</span></div><button type="button" onClick={() => selectListing(emptyListing())}>Add new</button></div>
-            <div className="admin-listing-list">{items.map((item) => <button className={selected?.id === item.id ? "selected" : ""} type="button" key={item.id} onClick={() => selectListing(item)}><span><strong>{item.nameEn}</strong><small>{categoryLabels.get(item.categoryId) ?? "Uncategorised"}</small></span><em className={`listing-status status-${item.status}`}>{item.status}</em></button>)}{!items.length ? <div className="admin-list-empty"><PackagePlus /><p>No live records yet. Create the first listing.</p></div> : null}</div>
+            <div className="panel-heading"><div><h2>Catalogue</h2><span>{visibleItems.length} of {items.length} records{lowStockCount > 0 ? ` · ${lowStockCount} low on stock` : ""}</span></div><button type="button" onClick={() => selectListing(emptyListing())}>Add new</button></div>
+            <div className="listing-list-toolbar">
+              <label className="listing-list-search"><Search /><input value={listQuery} onChange={(event) => setListQuery(event.target.value)} placeholder="Search name, SKU, category…" /></label>
+              <button className={lowStockOnly ? "active" : ""} type="button" onClick={() => setLowStockOnly((current) => !current)}><Boxes /> Low stock{lowStockCount > 0 ? ` (${lowStockCount})` : ""}</button>
+            </div>
+            {lowStockOnly ? <p className="admin-orders-view-note"><AlertCircle /> Showing only products at or below their low-stock threshold. <button type="button" onClick={() => setLowStockOnly(false)}>Show everything</button></p> : null}
+            <div className="admin-listing-list">{visibleItems.map((item) => {
+              const lowStock = isLowStockListing(item);
+              const primaryImage = item.images.find((image) => image.is_primary)?.url ?? item.images[0]?.url ?? "";
+              return <button
+                className={`${selected?.id === item.id ? "selected" : ""}${lowStock ? " listing-row-low-stock" : ""}`}
+                type="button"
+                key={item.id}
+                onClick={() => selectListing(item)}
+                onMouseEnter={(event) => setHoverPreview({ name: item.nameEn, url: primaryImage, x: event.clientX, y: event.clientY })}
+                onMouseMove={(event) => setHoverPreview({ name: item.nameEn, url: primaryImage, x: event.clientX, y: event.clientY })}
+                onMouseLeave={() => setHoverPreview(null)}
+              ><span><strong>{item.nameEn}</strong><small>{categoryLabels.get(item.categoryId) ?? "Uncategorised"}</small></span><span className="listing-row-flags">{lowStock ? <i className="listing-low-flag">Low stock</i> : null}<em className={`listing-status status-${item.status}`}>{item.status}</em></span></button>;
+            })}{!visibleItems.length ? <div className="admin-list-empty"><PackagePlus /><p>{listQuery || lowStockOnly ? "No records match this filter." : "No live records yet. Create the first listing."}</p></div> : null}</div>
+            {hoverPreview ? <div className="listing-hover-preview" style={{ left: Math.min(hoverPreview.x + 18, window.innerWidth - 210), top: hoverPreview.y + 18 }}>{hoverPreview.url ? <img src={hoverPreview.url} alt={hoverPreview.name} /> : <span className="listing-hover-preview-empty">No photo</span>}<small>{hoverPreview.name}</small></div> : null}
           </section>
 
           <section className="category-edit-panel">

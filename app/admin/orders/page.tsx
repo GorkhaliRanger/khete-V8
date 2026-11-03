@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, CircleDollarSign, Clock3, ExternalLink, FileText, LoaderCircle, MapPin, PackageCheck, ReceiptText, RefreshCw, Save, Search, ShieldCheck, ShoppingBag, Truck, UserRound } from "lucide-react";
+import { AlertTriangle, CheckCircle2, CircleDollarSign, Clock3, ExternalLink, FileText, LoaderCircle, MapPin, PackageCheck, ReceiptText, RefreshCw, Save, Search, ShieldCheck, ShoppingBag, Truck, UserRound } from "lucide-react";
 import { AdminAccessCard, type AdminAccessState } from "@/components/admin-access-card";
 import { AdminSidebar } from "@/components/admin-sidebar";
 import { formatNpr } from "@/data/marketplace";
-import { formatOrderDate, labelOrderDocumentType, labelOrderStatus, labelPaymentStatus, orderDocumentSelect, orderItemSelect, orderSelect, orderStatuses, paymentStatuses, type OrderDocumentRow, type OrderDocumentType, type OrderItemRow, type OrderRow, type OrderStatus, type OrderWithItems, type PaymentStatus } from "@/lib/orders";
+import { formatOrderDate, isOverduePendingOrder, isPendingOrder, labelOrderDocumentType, labelOrderStatus, labelPaymentStatus, orderDocumentSelect, orderItemSelect, orderSelect, orderStatuses, paymentStatuses, type OrderDocumentRow, type OrderDocumentType, type OrderItemRow, type OrderRow, type OrderStatus, type OrderWithItems, type PaymentStatus } from "@/lib/orders";
 import { createClient } from "@/lib/supabase/client";
 
 const orderRoles = new Set(["super_admin", "order_delivery_manager", "customer_support", "finance_manager"]);
@@ -250,9 +250,13 @@ export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | OrderStatus>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | OrderStatus>("all");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("view") === "pending") setStatusFilter("pending");
+  }, []);
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
@@ -323,7 +327,8 @@ export default function AdminOrdersPage() {
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return orders.filter((order) => {
-      if (statusFilter !== "all" && order.status !== statusFilter) return false;
+      if (statusFilter === "pending" && !isPendingOrder(order.status)) return false;
+      if (statusFilter !== "all" && statusFilter !== "pending" && order.status !== statusFilter) return false;
       if (!needle) return true;
       return [order.order_number, order.customer_name, order.customer_email, order.customer_phone, order.district, ...order.items.map((item) => item.listing_name)].some((value) => value.toLowerCase().includes(needle));
     });
@@ -332,6 +337,12 @@ export default function AdminOrdersPage() {
   const selected = orders.find((order) => order.id === selectedId) ?? null;
   const activeCount = orders.filter((order) => !["delivered", "cancelled", "returned", "refunded"].includes(order.status)).length;
   const awaitingPayment = orders.filter((order) => order.payment_status === "unpaid" || order.payment_status === "pending").length;
+  const pendingCount = orders.filter((order) => isPendingOrder(order.status)).length;
+  const overdueCount = orders.filter((order) => isPendingOrder(order.status) && isOverduePendingOrder(order.placed_at)).length;
+
+  function overdueHours(placedAt: string) {
+    return Math.max(1, Math.floor((Date.now() - new Date(placedAt).getTime()) / (60 * 60 * 1000)));
+  }
 
   if (access !== "allowed") return <AdminAccessCard access={access} email={accountEmail} roles={detectedRoles} origin={currentOrigin} resource="orders" error={error} requirement="the Super Admin, Order & Delivery, Customer Support, or Finance Manager role" />;
 
@@ -340,12 +351,16 @@ export default function AdminOrdersPage() {
       <AdminSidebar active="orders" />
       <section className="admin-main">
         <header className="admin-page-heading"><div><p className="eyebrow">Order operations</p><h1>Orders & delivery</h1><p>Review incoming order requests, payment state, fulfilment, dispatch and delivery from one workspace.</p></div><div className="admin-create-actions"><button type="button" onClick={() => void loadOrders()} disabled={loading}>{loading ? <LoaderCircle className="admin-spinner" /> : <RefreshCw />} Refresh orders</button></div></header>
-        <div className="admin-order-stats"><article><ShoppingBag /><span><small>Total orders</small><strong>{orders.length}</strong></span></article><article><Truck /><span><small>Active fulfilment</small><strong>{activeCount}</strong></span></article><article><CircleDollarSign /><span><small>Awaiting payment</small><strong>{awaitingPayment}</strong></span></article><article><PackageCheck /><span><small>Delivered</small><strong>{orders.filter((order) => order.status === "delivered").length}</strong></span></article></div>
+        <div className="admin-order-stats"><article><ShoppingBag /><span><small>Total orders</small><strong>{orders.length}</strong></span></article><article className={overdueCount > 0 ? "admin-order-stat-alert" : ""}><Clock3 /><span><small>Pending (unprocessed)</small><strong>{pendingCount}</strong>{overdueCount > 0 ? <em className="admin-order-stat-flag">{overdueCount} overdue</em> : null}</span></article><article><Truck /><span><small>Active fulfilment</small><strong>{activeCount}</strong></span></article><article><CircleDollarSign /><span><small>Awaiting payment</small><strong>{awaitingPayment}</strong></span></article><article><PackageCheck /><span><small>Delivered</small><strong>{orders.filter((order) => order.status === "delivered").length}</strong></span></article></div>
         {error ? <p className="admin-notice admin-error-notice">{error}</p> : null}
         <div className="admin-orders-layout">
           <aside className="admin-orders-list-panel">
-            <div className="admin-orders-filters"><label><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Order, customer, phone…" /></label><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "all" | OrderStatus)}><option value="all">All statuses</option>{orderStatuses.map((status) => <option key={status} value={status}>{labelOrderStatus(status)}</option>)}</select></div>
-            <div className="admin-orders-list">{loading && !orders.length ? <div className="admin-list-empty"><LoaderCircle className="admin-spinner" /> Loading orders…</div> : null}{!loading && !filtered.length ? <div className="admin-list-empty"><ShoppingBag /><strong>No matching orders</strong><span>New order requests will appear here.</span></div> : filtered.map((order) => <button className={order.id === selectedId ? "selected" : ""} type="button" key={order.id} onClick={() => setSelectedId(order.id)}><span><strong>{order.order_number}</strong><small>{order.customer_name} · {order.district}</small><em>{formatOrderDate(order.placed_at)}</em></span><span><b>{formatNpr(Number(order.total))}</b><i className={`order-status order-status-${order.status}`}>{labelOrderStatus(order.status)}</i></span></button>)}</div>
+            <div className="admin-orders-filters"><label><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Order, customer, phone…" /></label><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "all" | "pending" | OrderStatus)}><option value="all">All statuses</option><option value="pending">Pending — unprocessed</option>{orderStatuses.map((status) => <option key={status} value={status}>{labelOrderStatus(status)}</option>)}</select></div>
+            {statusFilter === "pending" ? <p className="admin-orders-view-note"><AlertTriangle /> Showing orders that have not been processed at all. <button type="button" onClick={() => setStatusFilter("all")}>Show all orders</button></p> : null}
+            <div className="admin-orders-list">{loading && !orders.length ? <div className="admin-list-empty"><LoaderCircle className="admin-spinner" /> Loading orders…</div> : null}{!loading && !filtered.length ? <div className="admin-list-empty"><ShoppingBag /><strong>No matching orders</strong><span>New order requests will appear here.</span></div> : filtered.map((order) => {
+              const overdue = isPendingOrder(order.status) && isOverduePendingOrder(order.placed_at);
+              return <button className={`${order.id === selectedId ? "selected" : ""}${overdue ? " order-row-overdue" : ""}`} type="button" key={order.id} onClick={() => setSelectedId(order.id)}><span><strong>{order.order_number}</strong><small>{order.customer_name} · {order.district}</small><em>{formatOrderDate(order.placed_at)}</em></span><span><b>{formatNpr(Number(order.total))}</b>{overdue ? <i className="order-overdue-flag">Overdue · {overdueHours(order.placed_at)}h</i> : null}<i className={`order-status order-status-${order.status}`}>{labelOrderStatus(order.status)}</i></span></button>;
+            })}</div>
           </aside>
           {selected ? <OrderEditor key={selected.id} order={selected} onSaved={loadOrders} /> : <section className="admin-order-detail admin-empty-panel"><ShoppingBag /><h2>Select an order</h2><p>Order and delivery details will appear here.</p></section>}
         </div>

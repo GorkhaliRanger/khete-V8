@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Archive, FileCheck2, FileText, FileUp, HandCoins, Headphones, LayoutDashboard, Megaphone, Package, ShoppingBag, Star, Tags, UserCog, UsersRound } from "lucide-react";
-type AdminSection = "dashboard" | "users" | "categories" | "listings" | "import" | "orders" | "support" | "reviews" | "certificates" | "network" | "professional-finance" | "inventory" | "promotions" | "content";
+import { FileCheck2, FileText, FileUp, HandCoins, Headphones, LayoutDashboard, Megaphone, Package, ShoppingBag, Sparkles, Star, Tags, UserCog, UsersRound } from "lucide-react";
+type AdminSection = "dashboard" | "users" | "categories" | "listings" | "import" | "orders" | "support" | "reviews" | "certificates" | "network" | "professional-finance" | "promotions" | "homepage" | "content";
 
 const links = [
   { section: "dashboard", href: "/admin", label: "Dashboard", icon: LayoutDashboard },
@@ -15,8 +15,8 @@ const links = [
   { section: "certificates", href: "/admin/certificates", label: "Certificates", icon: FileCheck2, roles: ["super_admin", "product_inventory_manager", "customer_support", "content_promotion_manager"] },
   { section: "network", href: "/admin/network", label: "Professional Network", icon: UsersRound, roles: ["super_admin", "content_promotion_manager", "customer_support"] },
   { section: "professional-finance", href: "/admin/professional-finance", label: "Professional Finance", icon: HandCoins, roles: ["super_admin", "finance_manager", "order_delivery_manager"] },
-  { section: "inventory", href: "/admin/listings#inventory", label: "Inventory", icon: Archive, roles: ["super_admin", "product_inventory_manager"] },
   { section: "promotions", href: "/admin/promotions", label: "Promotions", icon: Megaphone, roles: ["super_admin", "content_promotion_manager"] },
+  { section: "homepage", href: "/admin/homepage", label: "Homepage Highlights", icon: Sparkles, roles: ["super_admin", "content_promotion_manager", "product_inventory_manager"] },
   { section: "content", href: "/admin/content", label: "Policies & Content", icon: FileText, roles: ["super_admin", "content_promotion_manager"] },
 ] as const;
 
@@ -27,7 +27,7 @@ export function AdminSidebar({ active, roles }: { active: AdminSection; roles?: 
   return (
     <aside className="admin-sidebar">
       <Link className="admin-brand" href="/admin">
-        <span><Image src="/khete-logo.png" alt="khetE" width={180} height={80} /></span>
+        <span><Image src="/khete-logo.png" alt="khetE" width={204} height={50} /></span>
         <small>Administration</small>
       </Link>
       <nav>{visibleLinks.map((item) => { const Icon = item.icon; return <Link className={active === item.section ? "active" : ""} href={item.href} key={`${item.section}-${item.label}`}><Icon /> {item.label}</Link>; })}</nav>

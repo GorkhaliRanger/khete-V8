@@ -17,6 +17,8 @@ import {
   X,
 } from "lucide-react";
 import { useMarketplace } from "@/components/marketplace-provider";
+import { BrandName } from "@/components/brand-name";
+import { ServiceGuidanceCallout } from "@/components/service-guidance-callout";
 import { EntityCertificates } from "@/components/entity-certificates";
 import { formatNpr } from "@/data/marketplace";
 import { labelProfessionalOfferingKind } from "@/lib/professional-finance";
@@ -209,17 +211,24 @@ export function ProfessionalServiceMarketplace({
       <div className="site-container">
         <header className="professional-services-heading">
           <div>
-            <p className="eyebrow">Verified professional services</p>
-            <h2>Book guidance and practical support</h2>
+            <p className="eyebrow">Advisors & experts for hire</p>
+            <h2>Hire a professional for your farm</h2>
             <p>
               Request a service from an approved Advisor, Expert Professional or Associate
               Partner. The price shown is verified when the request is submitted.
             </p>
           </div>
-          <Link className="secondary-button" href="/account/service-requests">
-            My service requests <ArrowRight />
-          </Link>
+          <div className="professional-services-heading-actions">
+            <Link className="secondary-button" href="/experts/apply">
+              Become a <BrandName /> Pro
+            </Link>
+            <Link className="secondary-button" href="/account/service-requests">
+              My service requests <ArrowRight />
+            </Link>
+          </div>
         </header>
+
+        <ServiceGuidanceCallout />
 
         <div className="professional-service-toolbar">
           <label className="professional-service-search">
@@ -296,39 +305,42 @@ export function ProfessionalServiceMarketplace({
             const provider = offering.professional_profiles;
             return (
               <article className="professional-service-card" key={offering.id}>
-                <header>
-                  <span
-                    className={`professional-service-provider-image${provider.role === "associate_partner" ? " brand-image" : ""}`}
-                    style={
-                      provider.profile_image_url
-                        ? { backgroundImage: `url("${provider.profile_image_url}")` }
-                        : undefined
-                    }
-                  >
-                    {!provider.profile_image_url
-                      ? provider.role === "associate_partner"
-                        ? <Building2 />
-                        : <UserRound />
-                      : null}
-                  </span>
-                  <span>
-                    <strong>{provider.name}</strong>
-                    <small>
-                      <BadgeCheck /> {labelProfessionalRole(provider.role)}
-                    </small>
-                  </span>
-                  <Link href={`/experts/${provider.slug}`} aria-label={`View ${provider.name}`}>
-                    <ArrowRight />
-                  </Link>
-                </header>
-                <div>
-                  <span>{labelProfessionalOfferingKind(offering.kind)}</span>
-                  <h3>{offering.title}</h3>
-                  <p>{offering.description || "Contact the professional through a verified khetE request."}</p>
-                </div>
-                <div className="professional-service-location">
-                  <MapPin /> {provider.location}
-                </div>
+                <Link
+                  className="professional-service-card-main"
+                  href={`/experts/${provider.slug}`}
+                  aria-label={`View ${provider.name}'s profile`}
+                >
+                  <header>
+                    <span
+                      className={`professional-service-provider-image${provider.role === "associate_partner" ? " brand-image" : ""}`}
+                      style={
+                        provider.profile_image_url
+                          ? { backgroundImage: `url("${provider.profile_image_url}")` }
+                          : undefined
+                      }
+                    >
+                      {!provider.profile_image_url
+                        ? provider.role === "associate_partner"
+                          ? <Building2 />
+                          : <UserRound />
+                        : null}
+                    </span>
+                    <span>
+                      <strong>{provider.name}</strong>
+                      <small>
+                        <BadgeCheck /> {labelProfessionalRole(provider.role)}
+                      </small>
+                    </span>
+                  </header>
+                  <div className="professional-service-body">
+                    <span>{labelProfessionalOfferingKind(offering.kind)}</span>
+                    <h3>{offering.title}</h3>
+                    <p>{offering.description || "Contact the professional through a verified khetE request."}</p>
+                  </div>
+                  <div className="professional-service-location">
+                    <MapPin /> {provider.location}
+                  </div>
+                </Link>
                 <EntityCertificates targetType="offering" targetId={offering.id} compact />
                 <footer>
                   <div>
@@ -338,7 +350,7 @@ export function ProfessionalServiceMarketplace({
                     </strong>
                   </div>
                   <button className="primary-button" type="button" onClick={() => openRequest(offering)}>
-                    Request service
+                    {provider.role === "advisor" ? "Hire advisor" : provider.role === "expert_professional" ? "Hire expert" : "Request service"}
                   </button>
                 </footer>
               </article>

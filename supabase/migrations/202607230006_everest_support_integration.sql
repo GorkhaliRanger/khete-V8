@@ -145,7 +145,7 @@ declare
   v_message text := trim(coalesce(p_message, ''));
   v_order_number text := nullif(upper(trim(coalesce(p_order_number, ''))), '');
   v_requires_reference boolean := coalesce(p_type, '') = any (
-    array['order_issue', 'delivery_issue', 'return_request', 'payment_issue', 'custom_request']
+    array['order_issue', 'delivery_issue', 'return_request', 'payment_issue']
   );
 begin
   begin

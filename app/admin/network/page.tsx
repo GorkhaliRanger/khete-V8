@@ -141,6 +141,7 @@ export default function AdminNetworkPage() {
   const [profileQuery, setProfileQuery] = useState("");
   const [profileStatus, setProfileStatus] = useState<"all" | ProfessionalProfileStatus>("all");
   const [reviewNotes, setReviewNotes] = useState("");
+  const [applicationDocuments, setApplicationDocuments] = useState<{ id: string; file_name: string; mime_type: string; size_bytes: number; url: string }[]>([]);
   const [profileForm, setProfileForm] = useState<ProfileForm>(emptyProfile);
   const [pendingImage, setPendingImage] = useState<{ file: File; previewUrl: string } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -214,6 +215,39 @@ export default function AdminNetworkPage() {
   useEffect(() => {
     queueMicrotask(() => setReviewNotes(selectedApplication?.admin_notes ?? ""));
   }, [selectedApplication]);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadDocuments = async () => {
+      if (!selectedApplicationId) {
+        setApplicationDocuments([]);
+        return;
+      }
+      try {
+        const supabase = createClient();
+        const { data, error: loadError } = await supabase
+          .from("professional_application_documents")
+          .select("id,file_name,mime_type,size_bytes,storage_path")
+          .eq("application_id", selectedApplicationId)
+          .order("created_at", { ascending: true });
+        if (loadError) throw loadError;
+        const rows = (data ?? []) as { id: string; file_name: string; mime_type: string; size_bytes: number; storage_path: string }[];
+        const withUrls = await Promise.all(rows.map(async (row) => {
+          const { data: signed } = await supabase.storage
+            .from("application-documents")
+            .createSignedUrl(row.storage_path, 600);
+          return { id: row.id, file_name: row.file_name, mime_type: row.mime_type, size_bytes: row.size_bytes, url: signed?.signedUrl ?? "" };
+        }));
+        if (mounted) setApplicationDocuments(withUrls);
+      } catch {
+        if (mounted) setApplicationDocuments([]);
+      }
+    };
+    void loadDocuments();
+    return () => {
+      mounted = false;
+    };
+  }, [selectedApplicationId]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -425,6 +459,7 @@ export default function AdminNetworkPage() {
             <header><div><p className="eyebrow">{selectedApplication.application_number}</p><h2>{selectedApplication.organization_name || selectedApplication.applicant_name}</h2><span>{labelProfessionalRole(selectedApplication.role)} · {selectedApplication.position_title}</span></div><i className={`network-status network-status-${selectedApplication.status}`}>{labelProfessionalApplicationStatus(selectedApplication.status)}</i></header>
             <div className="admin-network-info-grid"><article><UserRound /><span><small>Applicant</small><strong>{selectedApplication.applicant_name}</strong><em>{selectedApplication.contact_email}{selectedApplication.contact_phone ? ` · ${selectedApplication.contact_phone}` : ""}</em></span></article><article><Building2 /><span><small>Location & experience</small><strong>{selectedApplication.location}</strong><em>{selectedApplication.experience}</em></span></article></div>
             <section className="admin-network-copy"><h3>Professional summary</h3><p>{selectedApplication.summary}</p><h3>Reason for joining</h3><p>{selectedApplication.motivation}</p><h3>Expertise</h3><div>{selectedApplication.expertise.map((item) => <span key={item}>{item}</span>)}</div>{selectedApplication.qualifications.length ? <><h3>Qualifications</h3><ul>{selectedApplication.qualifications.map((item) => <li key={item}>{item}</li>)}</ul></> : null}{selectedApplication.website_url ? <a href={selectedApplication.website_url} target="_blank" rel="noopener noreferrer"><ExternalLink /> Open submitted website</a> : null}</section>
+            <section className="admin-network-documents"><h3>Supporting documents</h3>{applicationDocuments.length ? <ul>{applicationDocuments.map((document) => <li key={document.id}><FileCheck2 /><span><strong>{document.file_name}</strong><small>{(document.size_bytes / 1024 / 1024).toFixed(1)} MB · {document.mime_type}</small></span>{document.url ? <a className="secondary-button" href={document.url} target="_blank" rel="noopener noreferrer"><ExternalLink /> Open</a> : <small>Link unavailable</small>}</li>)}</ul> : <p>No documents were attached to this application.</p>}</section>
             <section className="admin-network-review"><label>Review notes <small>Applicants can see this note in their application history.</small><textarea rows={5} value={reviewNotes} onChange={(event) => setReviewNotes(event.target.value)} placeholder="Add a decision explanation or request specific changes." /></label><div><button type="button" disabled={saving} onClick={() => void reviewApplication("under_review")}><Clock3 /> Under review</button><button type="button" disabled={saving} onClick={() => void reviewApplication("changes_requested")}><MessageCircle /> Request changes</button><button className="danger-button" type="button" disabled={saving} onClick={() => void reviewApplication("rejected")}><XCircle /> Not approved</button><button type="button" disabled={saving} onClick={() => void reviewApplication("approved", false)}><ShieldCheck /> Approve as draft</button><button className="primary-button" type="button" disabled={saving} onClick={() => void reviewApplication("approved", true)}>{saving ? <LoaderCircle className="admin-spinner" /> : <BadgeCheck />} Approve & publish</button></div></section>
           </section> : <section className="admin-network-detail admin-empty-panel"><FileCheck2 /><h2>Select an application</h2></section>}
         </div> : <div className="admin-network-layout">

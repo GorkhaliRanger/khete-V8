@@ -102,7 +102,7 @@ export function EntityCertificates({
         <div>
           <p className="eyebrow"><ShieldCheck /> Certificates & verification</p>
           <h2 id={`certificates-${targetType}-${targetId}`}>Linked certificates</h2>
-          <p>Open a certificate to review its issuer, validity, linked records and complete document.</p>
+          <p>Open a certificate to review its issuer, validity and linked records.</p>
         </div>
         <Link href="/certificates">All certificates <ChevronRight /></Link>
       </header>

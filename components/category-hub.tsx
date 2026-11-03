@@ -61,7 +61,6 @@ export function CategoryHub({ rootSlug }: { rootSlug: string }) {
     [data],
   );
   const activeChild = children.find((category) => category.slug === activeChildSlug);
-  const visibleGroups = activeChild ? [activeChild] : children;
 
   const updateRoute = (changes: { child?: string | null; grandchild?: string | null; page?: number | null }) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -96,32 +95,17 @@ export function CategoryHub({ rootSlug }: { rootSlug: string }) {
 
   return (
     <main className="category-hub-page">
-      <section className="category-hub-hero">
-        <div className="site-container">
-          <p className="eyebrow">Category marketplace</p>
-          <h1>{data.category.name}</h1>
-          <p>{data.category.description}</p>
-        </div>
-      </section>
-
       <section className="category-hub-navigation" aria-label={`${data.category.name} subcategories`}>
         <div className="site-container">
-          <div className="category-hub-nav-heading">
-            <div>
-              <p className="eyebrow">Browse this category</p>
-              <h2>Choose an area, or view everything together.</h2>
-            </div>
+          <div className="category-child-pills" role="list" aria-label="Child categories">
             <button
-              className={`category-all-button ${!activeChildSlug && !activeGrandchildSlug ? "is-active" : ""}`}
+              className={!activeChildSlug && !activeGrandchildSlug ? "is-active" : ""}
               type="button"
               onClick={() => updateRoute({ child: null, grandchild: null })}
             >
               <Layers3 />
-              <span><strong>All {data.category.name}</strong><small>{data.pagination.total} current listings</small></span>
+              <span>All {data.category.name}</span>
             </button>
-          </div>
-
-          <div className="category-child-pills" role="list" aria-label="Child categories">
             {children.map((child) => (
               <button
                 className={activeChildSlug === child.slug ? "is-active" : ""}
@@ -136,36 +120,28 @@ export function CategoryHub({ rootSlug }: { rootSlug: string }) {
             ))}
           </div>
 
-          <div className={`category-grandchild-groups ${activeChild ? "has-selection" : ""}`}>
-            {visibleGroups.map((child) => {
-              const grandchildren = childrenOf(data.subcategories, child.id);
-              return (
-                <article className="category-grandchild-group" key={child.id}>
-                  <button
-                    className={`category-group-title ${activeChildSlug === child.slug && !activeGrandchildSlug ? "is-active" : ""}`}
-                    type="button"
-                    onClick={() => updateRoute({ child: child.slug, grandchild: null })}
-                  >
-                    <span><strong>{child.name}</strong><small>{grandchildren.length} related categories</small></span>
-                    <ChevronRight />
-                  </button>
-                  <div className="category-grandchild-pills" role="list" aria-label={`${child.name} categories`}>
-                    {grandchildren.map((grandchild) => (
-                      <button
-                        className={activeGrandchildSlug === grandchild.slug ? "is-active" : ""}
-                        type="button"
-                        role="listitem"
-                        key={grandchild.id}
-                        onClick={() => updateRoute({ child: child.slug, grandchild: grandchild.slug })}
-                      >
-                        {grandchild.name}
-                      </button>
-                    ))}
-                  </div>
-                </article>
-              );
-            })}
-          </div>
+          {activeChild ? (
+            <div className="category-grandchild-pills category-hub-subpills" role="list" aria-label={`${activeChild.name} categories`}>
+              <button
+                className={!activeGrandchildSlug ? "is-active" : ""}
+                type="button"
+                onClick={() => updateRoute({ grandchild: null })}
+              >
+                All {activeChild.name}
+              </button>
+              {childrenOf(data.subcategories, activeChild.id).map((grandchild) => (
+                <button
+                  className={activeGrandchildSlug === grandchild.slug ? "is-active" : ""}
+                  type="button"
+                  role="listitem"
+                  key={grandchild.id}
+                  onClick={() => updateRoute({ child: activeChild.slug, grandchild: grandchild.slug })}
+                >
+                  {grandchild.name}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </div>
       </section>
 
@@ -181,7 +157,7 @@ export function CategoryHub({ rootSlug }: { rootSlug: string }) {
 
           {error ? <p className="category-hub-inline-error">{error}</p> : null}
           <div className={`product-grid category-hub-grid ${loading ? "is-loading" : ""}`}>
-            {data.products.map((listing) => <ProductCard key={listing.id} listing={listing} />)}
+            {data.products.map((listing) => <ProductCard key={listing.id} listing={listing} spotlight={Boolean(data.pinnedSlug && listing.slug === data.pinnedSlug)} />)}
           </div>
 
           {!loading && !data.products.length ? (

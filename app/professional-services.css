@@ -1,11 +1,15 @@
 /* Professional Services and Booking Requests */
-.professional-services-section { padding: 72px 0 78px; background: #f4f7f2; border-bottom: 1px solid var(--line); }
-.professional-services-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 28px; }
-.professional-services-heading > div { max-width: 760px; }
-.professional-services-heading h2 { margin: 4px 0 9px; font-family: Georgia,serif; font-size: clamp(2rem,4vw,3.25rem); font-weight: 500; }
-.professional-services-heading > div > p:last-child { margin: 0; color: var(--muted); line-height: 1.65; }
-.professional-services-heading .secondary-button svg { width: 17px; }
-.professional-service-toolbar { margin-top: 24px; padding: 12px; display: grid; grid-template-columns: minmax(270px,1fr) 210px 230px auto; align-items: end; gap: 10px; background: white; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 8px 26px rgba(20,55,31,.04); }
+.professional-services-section { padding: 44px 0 78px; background: #f4f7f2; border-bottom: 1px solid var(--line); }
+.professional-services-heading { padding: 18px 24px; display: flex; align-items: center; justify-content: space-between; gap: 28px; color: var(--green-950); background: linear-gradient(115deg, #f7f5ee, #eef2e7); border: 1px solid rgba(8,46,28,.1); border-radius: 18px; box-shadow: 0 8px 20px rgba(8,46,28,.05); }
+.professional-services-heading > div { max-width: 640px; }
+.professional-services-heading .eyebrow { margin-bottom: 3px; color: #4c8a5f; }
+.professional-services-heading h2 { margin: 0 0 5px; font-family: Georgia,serif; font-size: clamp(1.25rem, 2.2vw, 1.7rem); font-weight: 500; }
+.professional-services-heading > div > p:last-child { margin: 0; color: rgba(8,46,28,.62); font-size: .82rem; line-height: 1.55; }
+.professional-services-heading-actions { display: flex; flex-wrap: wrap; gap: 10px; flex: 0 0 auto; }
+.professional-services-heading .secondary-button { min-height: 42px; display: inline-flex; align-items: center; gap: 8px; padding: 0 18px; background: white; border-radius: 999px; font-size: .76rem; font-weight: 800; box-shadow: 0 6px 16px rgba(8,46,28,.06); }
+.professional-services-heading .secondary-button svg { width: 16px; }
+.professional-services-heading-actions .secondary-button:hover { transform: translateX(2px); border-color: var(--green-650); }
+.professional-service-toolbar { margin-top: 16px; padding: 12px; display: grid; grid-template-columns: minmax(270px,1fr) 210px 230px auto; align-items: end; gap: 10px; background: white; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 8px 26px rgba(20,55,31,.04); }
 .professional-service-toolbar > label { min-width: 0; display: grid; gap: 5px; color: var(--muted); font-size: .56rem; font-weight: 850; text-transform: uppercase; }
 .professional-service-toolbar input,.professional-service-toolbar select { min-width: 0; width: 100%; height: 42px; padding: 0 10px; outline: 0; color: var(--ink); background: #fbfcfa; border: 1px solid var(--line); border-radius: 9px; text-transform: none; }
 .professional-service-toolbar input:focus,.professional-service-toolbar select:focus { border-color: var(--green-650); box-shadow: 0 0 0 3px var(--green-100); }
@@ -17,23 +21,23 @@
 .professional-service-grid { margin-top: 16px; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; }
 .professional-service-card { min-width: 0; min-height: 365px; padding: 18px; display: flex; flex-direction: column; background: white; border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: 0 10px 30px rgba(20,55,31,.05); transition: transform .2s ease,border-color .2s ease,box-shadow .2s ease; }
 .professional-service-card:hover { transform: translateY(-3px); border-color: #b6d0ba; box-shadow: var(--shadow); }
-.professional-service-card > header { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 10px; }
+.professional-service-card-main { flex: 1; display: flex; flex-direction: column; color: inherit; text-decoration: none; }
+.professional-service-card-main:hover strong { color: var(--green-800); }
+.professional-service-card-main > header { display: grid; grid-template-columns: auto minmax(0,1fr); align-items: center; gap: 10px; }
 .professional-service-provider-image { width: 48px; height: 48px; display: grid; place-items: center; overflow: hidden; color: var(--green-800); background-color: var(--green-100); background-position: center; background-size: cover; border: 1px solid var(--line); border-radius: 13px; }
 .professional-service-provider-image.brand-image { background-color: white; background-repeat: no-repeat; background-size: contain; }
 .professional-service-provider-image svg { width: 21px; }
-.professional-service-card > header > span:nth-child(2) { min-width: 0; display: grid; gap: 4px; }
-.professional-service-card > header strong { overflow: hidden; font-size: .72rem; text-overflow: ellipsis; white-space: nowrap; }
-.professional-service-card > header small { display: inline-flex; align-items: center; gap: 4px; color: var(--green-650); font-size: .55rem; font-weight: 800; }
-.professional-service-card > header small svg { width: 14px; }
-.professional-service-card > header > a { width: 34px; height: 34px; display: grid; place-items: center; color: var(--green-800); background: var(--green-50); border-radius: 50%; }
-.professional-service-card > header > a svg { width: 16px; }
-.professional-service-card > div:nth-child(2) { padding: 21px 0 12px; }
-.professional-service-card > div:nth-child(2) > span { color: var(--green-650); font-size: .55rem; font-weight: 850; text-transform: uppercase; }
+.professional-service-card-main > header > span:nth-child(2) { min-width: 0; display: grid; gap: 4px; }
+.professional-service-card-main > header strong { overflow: hidden; font-size: .72rem; text-overflow: ellipsis; white-space: nowrap; }
+.professional-service-card-main > header small { display: inline-flex; align-items: center; gap: 4px; color: var(--green-650); font-size: .55rem; font-weight: 800; }
+.professional-service-card-main > header small svg { width: 14px; }
+.professional-service-body { padding: 21px 0 12px; }
+.professional-service-body > span { color: var(--green-650); font-size: .55rem; font-weight: 850; text-transform: uppercase; }
 .professional-service-card h3 { margin: 7px 0 8px; font-family: Georgia,serif; font-size: 1.38rem; font-weight: 500; }
-.professional-service-card > div:nth-child(2) p { margin: 0; color: var(--muted); font-size: .66rem; line-height: 1.6; }
+.professional-service-body p { margin: 0; color: var(--muted); font-size: .66rem; line-height: 1.6; }
 .professional-service-location { margin-top: auto; padding: 11px 0; display: flex; align-items: center; gap: 6px; color: var(--muted); border-top: 1px solid #edf0ea; font-size: .61rem; }
 .professional-service-location svg { width: 16px; color: var(--green-650); }
-.professional-service-card > footer { padding-top: 13px; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; border-top: 1px solid #edf0ea; }
+.professional-service-card > footer { margin-top: 13px; padding-top: 13px; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; border-top: 1px solid #edf0ea; }
 .professional-service-card > footer > div { display: grid; gap: 3px; }
 .professional-service-card > footer small { color: var(--muted); font-size: .54rem; }
 .professional-service-card > footer strong { font-size: .83rem; }
@@ -165,4 +169,57 @@
   .service-request-hero > div:last-child { align-items: stretch; flex-direction: column; }
   .customer-service-request-list > article > footer { align-items: stretch; flex-direction: column; }
   .customer-service-request-list > article > footer button { justify-content: center; }
+}
+
+/* Related professionals on profile pages */
+.related-professionals { margin-top: 58px; padding-top: 42px; border-top: 1px solid var(--line); }
+.related-professionals header h2 { margin: 4px 0 22px; font-family: Georgia,serif; font-size: clamp(1.6rem,3vw,2.4rem); font-weight: 500; }
+.related-professionals-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 18px; }
+.related-professional-card { min-width: 0; padding: 16px; display: flex; align-items: flex-start; gap: 13px; background: white; border: 1px solid var(--line); border-radius: var(--radius-md); transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
+.related-professional-card:hover { transform: translateY(-3px); border-color: #b6d0ba; box-shadow: var(--shadow); }
+.related-professional-photo { flex: 0 0 auto; width: 62px; height: 62px; display: grid; place-items: center; overflow: hidden; color: white; background: var(--expert-color, var(--green-800)); border-radius: 18px; font-family: Georgia,serif; font-size: 1.15rem; font-weight: 700; background-size: cover; background-position: center top; }
+.related-professional-info { min-width: 0; display: grid; gap: 3px; }
+.related-professional-info small { display: inline-flex; align-items: center; gap: 4px; color: var(--green-650); font-size: .56rem; font-weight: 800; text-transform: uppercase; }
+.related-professional-info small svg { width: 13px; }
+.related-professional-info strong { font-family: Georgia,serif; font-size: 1rem; line-height: 1.2; }
+.related-professional-info em { color: var(--muted); font-size: .68rem; font-style: normal; line-height: 1.4; }
+.related-professional-info .expert-profile-meta { margin-top: 4px; font-size: .64rem; }
+.related-professional-info .expert-profile-meta svg { width: 13px; }
+
+/* Professional credentials upload (dashboard) */
+.professional-credentials { display: grid; grid-template-columns: minmax(0,1.15fr) minmax(0,.85fr); gap: 26px; align-items: start; }
+.professional-credentials-upload, .professional-credentials-list { padding: 22px; background: white; border: 1px solid var(--line); border-radius: var(--radius-md); }
+.professional-credentials-upload header h3, .professional-credentials-list header h3 { margin: 4px 0 8px; font-family: Georgia,serif; font-size: 1.3rem; font-weight: 500; }
+.professional-credentials-upload header p:last-child { margin: 0 0 16px; color: var(--muted); font-size: .76rem; line-height: 1.6; }
+.professional-credentials-file span { display: inline-flex; align-items: center; gap: 8px; padding: 11px 14px; width: 100%; color: var(--green-800); background: var(--green-50); border: 1px dashed #b6d0ba; border-radius: var(--radius-sm, 10px); font-size: .78rem; font-weight: 650; cursor: pointer; }
+.professional-credentials-notice { margin-bottom: 14px; padding: 11px 14px; color: #1d5c3c; background: #e8f4ec; border: 1px solid #bfe0cb; border-radius: 10px; font-size: .76rem; }
+.professional-credential-row { padding: 13px 0; display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 12px; border-bottom: 1px solid #edf0ea; }
+.professional-credential-row:last-of-type { border-bottom: 0; }
+.professional-credential-row > div { min-width: 0; display: grid; gap: 2px; }
+.professional-credential-row strong { font-size: .8rem; }
+.professional-credential-row small { color: var(--muted); font-size: .64rem; }
+.professional-credential-row .professional-status { font-size: .58rem; white-space: nowrap; }
+.professional-credentials-privacy { margin: 16px 0 0; padding-top: 14px; display: flex; gap: 8px; color: var(--muted); border-top: 1px solid #edf0ea; font-size: .66rem; line-height: 1.55; }
+.professional-credentials-privacy svg { flex: 0 0 auto; width: 15px; color: var(--green-650); }
+.service-guidance-login { margin-top: 10px; display: block; width: 100%; color: var(--green-800); background: none; border: 0; font-size: .72rem; font-weight: 700; text-align: center; cursor: pointer; }
+
+/* Slim guidance strip attached to the professionals section heading */
+.service-guidance-card { margin: 2px 0 30px; padding: 18px 22px; display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 18px; background: linear-gradient(120deg, #f2f8f3, #ffffff 65%); border: 1px solid #cfe2d2; border-radius: var(--radius-md); box-shadow: 0 8px 22px rgba(20,55,31,.05); }
+.service-guidance-card-icon { width: 46px; height: 46px; display: grid; place-items: center; color: white; background: var(--green-800); border-radius: 15px; box-shadow: 0 8px 18px rgba(20,70,42,.2); }
+.service-guidance-card-icon svg { width: 21px; }
+.service-guidance-card-text { display: grid; gap: 4px; }
+.service-guidance-card-text strong { font-family: Georgia,serif; font-size: 1.08rem; font-weight: 500; }
+.service-guidance-card-text p { margin: 0; color: var(--muted); font-size: .74rem; line-height: 1.6; }
+.service-guidance-card .primary-button { min-height: 42px; padding: 0 18px; display: inline-flex; align-items: center; gap: 8px; border-radius: 11px; font-size: .7rem; white-space: nowrap; }
+
+@media (max-width: 900px) {
+  .related-professionals-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .professional-credentials { grid-template-columns: 1fr; }
+}
+@media (max-width: 520px) {
+  .related-professionals-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 720px) {
+  .service-guidance-card { grid-template-columns: 1fr; text-align: center; justify-items: center; gap: 14px; }
 }

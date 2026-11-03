@@ -2,9 +2,8 @@ import Link from "next/link";
 import { ArrowRight, BadgeCheck, BookOpen, Leaf, MapPin, PackageCheck, Quote, Truck } from "lucide-react";
 import { HomeCategoryGrid } from "@/components/home-category-grid";
 import { IntroGate } from "@/components/intro-gate";
-import { FeaturedListings } from "@/components/featured-listings";
 import { BrandName } from "@/components/brand-name";
-import { PromotionShowcase } from "@/components/promotion-showcase";
+import { HomeDealsSection, HomeListingSections } from "@/components/home-listing-rows";
 import { ProfessionalNetworkPreview } from "@/components/professional-network-preview";
 
 export default function HomePage() {
@@ -31,7 +30,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <PromotionShowcase placement="home" limit={2} />
+      <HomeDealsSection />
 
       <section className="home-section category-section">
         <div className="site-container">
@@ -40,17 +39,18 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="home-section featured-section">
-        <div className="site-container">
-          <div className="section-heading"><div><p className="eyebrow">New Arrivals</p><h2>Recently added products and varieties.</h2></div><Link className="text-button" href="/products">View more <ArrowRight size={17} /></Link></div>
-          <FeaturedListings />
-        </div>
-      </section>
+      <HomeListingSections />
 
       <section className="home-section experts-preview-section">
         <div className="site-container">
           <div className="section-heading"><div><p className="eyebrow">Experts & Partners</p><h2>Experience you can explore and trust.</h2><p>Meet advisors, specialist professionals and associate organisations working across agriculture.</p></div><Link className="text-button" href="/experts">View the full network <ArrowRight size={17} /></Link></div>
-          <ProfessionalNetworkPreview />
+          <div className="experts-preview-layout">
+            <div className="experts-preview-photo">
+              <img src="/experts/experts-partners.png" alt="A khetE agricultural advisor reviewing crops together with a farmer in the field" />
+              <span className="experts-preview-photo-tag"><BadgeCheck size={15} /> Verified advisors &amp; partners</span>
+            </div>
+            <ProfessionalNetworkPreview />
+          </div>
         </div>
       </section>
 

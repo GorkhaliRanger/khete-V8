@@ -1,8 +1,17 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element -- profile photos are stored as local data URLs. */
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Heart, Menu, Search, ShoppingCart, UserRound, X } from "lucide-react";
+import {
+  Heart,
+  Menu,
+  Search,
+  ShoppingCart,
+  UserRound,
+  X,
+} from "lucide-react";
 import { BrandName } from "./brand-name";
 import { useMarketplace } from "./marketplace-provider";
 import { useState } from "react";
@@ -17,7 +26,7 @@ const navigation = [
 
 export function SiteHeader() {
   const pathname = usePathname();
-  const { searchQuery, setSearchQuery, openLogin, wishlist, cartCount, user, authReady } = useMarketplace();
+  const { searchQuery, setSearchQuery, openLogin, wishlist, cartCount, user, authReady, profilePhoto } = useMarketplace();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -66,7 +75,7 @@ export function SiteHeader() {
             </button>
             {user ? (
               <Link className="icon-button account-button signed-in" href="/account" aria-label="Open your account" title={user.email ?? "Your account"}>
-                <UserRound />
+                {profilePhoto ? <img className="account-avatar-img" src={profilePhoto} alt="" /> : <UserRound />}
                 <span className="account-status-dot" aria-hidden="true" />
               </Link>
             ) : (
