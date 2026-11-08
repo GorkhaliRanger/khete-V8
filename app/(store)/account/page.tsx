@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, BriefcaseBusiness, CalendarClock, FileText, Heart, LoaderCircle, LogOut, MapPin, PackageCheck, RotateCcw, ShoppingBag, Star, UserRound } from "lucide-react";
 import { BrandName } from "@/components/brand-name";
+import { PasswordSettings } from "@/components/password-settings";
 import { useMarketplace } from "@/components/marketplace-provider";
 import { formatNpr } from "@/data/marketplace";
 import { formatOrderDate, labelOrderStatus, labelPaymentStatus, orderItemSelect, orderSelect, type OrderItemRow, type OrderRow, type OrderWithItems } from "@/lib/orders";
@@ -171,6 +172,8 @@ export default function AccountPage() {
           </div>
           <button className="secondary-button account-signout" type="button" onClick={() => void signOut()}><LogOut /> Log out</button>
         </section>
+
+        <PasswordSettings title="Change account password" description="Update the password used for customer and linked Professional Account sign-in." />
 
         <section className="account-orders" aria-labelledby="account-orders-heading">
           <div className="account-section-heading">

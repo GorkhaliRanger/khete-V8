@@ -13,9 +13,7 @@ import {
   FileCheck2,
   HandCoins,
   Headphones,
-  LoaderCircle,
   Package,
-  RefreshCw,
   RotateCcw,
   ShoppingBag,
   Star,
@@ -103,12 +101,10 @@ export default function AdminPage() {
   const [detectedRoles, setDetectedRoles] = useState<string[]>([]);
   const [currentOrigin, setCurrentOrigin] = useState("");
   const [data, setData] = useState<DashboardData>(emptyDashboard);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [unavailable, setUnavailable] = useState<string[]>([]);
 
   const loadDashboard = useCallback(async () => {
-    setLoading(true);
     setError("");
     const supabase = createClient();
     const unavailableSections: string[] = [];
@@ -197,8 +193,6 @@ export default function AdminPage() {
       setUnavailable([...new Set(unavailableSections)]);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The dashboard could not be loaded.");
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -249,11 +243,6 @@ export default function AdminPage() {
     <main className="admin-shell admin-dashboard-page">
       <AdminSidebar active="dashboard" />
       <section className="admin-main">
-        <header className="admin-page-heading admin-dashboard-heading">
-          <div><p className="eyebrow">Marketplace control centre</p><h1>Dashboard</h1></div>
-          <button type="button" onClick={() => void loadDashboard()} disabled={loading}>{loading ? <LoaderCircle className="admin-spinner" /> : <RefreshCw />} Refresh dashboard</button>
-        </header>
-
         {error ? <p className="admin-notice admin-error-notice">{error}</p> : null}
         {unavailable.length ? <p className="admin-dashboard-warning"><AlertTriangle /> Some modules are unavailable: {unavailable.join(", ")}. Confirm their Supabase migrations have been installed.</p> : null}
 

@@ -1,16 +1,39 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, Clock3, LoaderCircle, MailPlus, Phone, RefreshCw, Save, Search, Send, ShieldCheck, UserCog, UsersRound } from "lucide-react";
+import {
+  Check,
+  Clock3,
+  KeyRound,
+  LoaderCircle,
+  MailPlus,
+  Phone,
+  RefreshCw,
+  Save,
+  Search,
+  Send,
+  ShieldCheck,
+  Trash2,
+  UserCheck,
+  UserCog,
+  UserX,
+  UsersRound,
+} from "lucide-react";
 import { AdminAccessCard, type AdminAccessState } from "@/components/admin-access-card";
 import { AdminSidebar } from "@/components/admin-sidebar";
-import { ADMIN_ROLES, ADMIN_ROLE_DETAILS, type AdminRole } from "@/lib/admin-permissions";
+import {
+  ADMIN_ROLE_DETAILS,
+  MANAGEABLE_ADMIN_ROLES,
+  type AdminRole,
+  type ManageableAdminRole,
+} from "@/lib/admin-permissions";
 import { createClient } from "@/lib/supabase/client";
 
 type StaffAccount = {
   user_id: string;
   email: string;
   full_name: string;
+  phone: string;
   is_active: boolean;
   roles: string[];
   created_at: string;
@@ -27,6 +50,12 @@ type PendingInvitation = {
   created_at: string;
 };
 
+type Action = "save" | "reset" | "delete" | "";
+
+function manageableRoles(roles: readonly string[]) {
+  return roles.filter((role): role is ManageableAdminRole => (MANAGEABLE_ADMIN_ROLES as readonly string[]).includes(role));
+}
+
 export default function AdminUsersPage() {
   const [access, setAccess] = useState<AdminAccessState>("loading");
   const [email, setEmail] = useState("");
@@ -37,17 +66,27 @@ export default function AdminUsersPage() {
   const [inviteName, setInviteName] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [invitePhone, setInvitePhone] = useState("");
-  const [inviteRoles, setInviteRoles] = useState<AdminRole[]>([]);
+  const [inviteRoles, setInviteRoles] = useState<ManageableAdminRole[]>([]);
   const [inviting, setInviting] = useState(false);
   const [selectedId, setSelectedId] = useState("");
-  const [draftRoles, setDraftRoles] = useState<AdminRole[]>([]);
+  const [draftName, setDraftName] = useState("");
+  const [draftPhone, setDraftPhone] = useState("");
+  const [draftActive, setDraftActive] = useState(true);
+  const [draftRoles, setDraftRoles] = useState<ManageableAdminRole[]>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [action, setAction] = useState<Action>("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  const load = useCallback(async () => {
+  const populateDraft = useCallback((account?: StaffAccount) => {
+    setDraftName(account?.full_name ?? "");
+    setDraftPhone(account?.phone ?? "");
+    setDraftActive(account?.is_active ?? true);
+    setDraftRoles(manageableRoles(account?.roles ?? []));
+  }, []);
+
+  const load = useCallback(async (preferredId?: string) => {
     setLoading(true);
     setError("");
     const supabase = createClient();
@@ -72,25 +111,24 @@ export default function AdminUsersPage() {
       setLoading(false);
       return;
     }
+
     setAccess("allowed");
     const { data, error: directoryError } = await supabase.rpc("admin_user_directory");
     if (directoryError) {
       setError(directoryError.message);
     } else {
       const next = (data ?? []) as StaffAccount[];
+      const nextSelected = next.find((account) => account.user_id === preferredId) ?? next[0];
       setAccounts(next);
-      setSelectedId((current) => {
-        if (current) return current;
-        const first = next[0];
-        if (first) setDraftRoles(first.roles.filter((role): role is AdminRole => (ADMIN_ROLES as readonly string[]).includes(role)));
-        return first?.user_id || "";
-      });
+      setSelectedId(nextSelected?.user_id ?? "");
+      populateDraft(nextSelected);
     }
+
     const { data: invitationRows, error: invitationError } = await supabase.rpc("admin_invitation_directory");
     if (invitationError) setError((current) => current || invitationError.message);
     else setInvitations((invitationRows ?? []) as PendingInvitation[]);
     setLoading(false);
-  }, []);
+  }, [populateDraft]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
@@ -98,43 +136,87 @@ export default function AdminUsersPage() {
   }, [load]);
 
   const selected = accounts.find((account) => account.user_id === selectedId);
+  const protectedAccount = Boolean(selected?.roles.includes("super_admin"));
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
     if (!term) return accounts;
-    return accounts.filter((account) => `${account.full_name} ${account.email}`.toLowerCase().includes(term));
+    return accounts.filter((account) => `${account.full_name} ${account.email} ${account.phone}`.toLowerCase().includes(term));
   }, [accounts, query]);
 
-  function toggleRole(role: AdminRole) {
+  function toggleRole(role: ManageableAdminRole) {
+    if (protectedAccount) return;
     setDraftRoles((current) => current.includes(role) ? current.filter((item) => item !== role) : [...current, role]);
   }
 
   function selectAccount(account: StaffAccount) {
     setSelectedId(account.user_id);
-    setDraftRoles(account.roles.filter((role): role is AdminRole => (ADMIN_ROLES as readonly string[]).includes(role)));
+    populateDraft(account);
     setNotice("");
     setError("");
   }
 
   async function save() {
-    if (!selected) return;
-    setSaving(true);
+    if (!selected || protectedAccount) return;
+    if (draftName.trim().length < 2) {
+      setError("Enter the administrator’s full name.");
+      return;
+    }
+    if (!draftRoles.length) {
+      setError("Select at least one administration role.");
+      return;
+    }
+
+    setAction("save");
     setError("");
     setNotice("");
     const supabase = createClient();
-    const { error: saveError } = await supabase.rpc("set_admin_roles", {
+    const { error: saveError } = await supabase.rpc("update_admin_account", {
       target_user_id: selected.user_id,
+      requested_full_name: draftName.trim(),
+      requested_phone: draftPhone.trim(),
+      requested_is_active: draftActive,
       requested_roles: draftRoles,
     });
     if (saveError) setError(saveError.message);
     else {
-      setNotice(`Authority updated for ${selected.full_name || selected.email}.`);
-      await load();
+      setNotice(`Profile and authority updated for ${draftName.trim()}.`);
+      await load(selected.user_id);
     }
-    setSaving(false);
+    setAction("");
   }
 
-  function toggleInviteRole(role: AdminRole) {
+  async function requestPasswordReset() {
+    if (!selected || protectedAccount) return;
+    setAction("reset");
+    setError("");
+    setNotice("");
+    const response = await fetch(`/api/admin/users/${selected.user_id}/password-reset`, { method: "POST" });
+    const result = await response.json() as { error?: string };
+    if (!response.ok) setError(result.error ?? "The password reset could not be sent.");
+    else setNotice(`A secure password-reset link was sent to ${selected.email}.`);
+    setAction("");
+  }
+
+  async function deleteAccount() {
+    if (!selected || protectedAccount) return;
+    const confirmed = window.confirm(`Permanently delete the administrator account for ${selected.full_name || selected.email}? This cannot be undone.`);
+    if (!confirmed) return;
+
+    setAction("delete");
+    setError("");
+    setNotice("");
+    const response = await fetch(`/api/admin/users/${selected.user_id}`, { method: "DELETE" });
+    const result = await response.json() as { error?: string };
+    if (!response.ok) setError(result.error ?? "The administrator could not be deleted.");
+    else {
+      setNotice(`${selected.full_name || selected.email} was deleted.`);
+      await load();
+    }
+    setAction("");
+  }
+
+  function toggleInviteRole(role: ManageableAdminRole) {
     setInviteRoles((current) => current.includes(role) ? current.filter((item) => item !== role) : [...current, role]);
   }
 
@@ -169,13 +251,13 @@ export default function AdminUsersPage() {
     if (otpError) {
       setError(`The invitation was saved, but the email code could not be sent: ${otpError.message}`);
     } else {
-      setNotice(`Verification code sent to ${normalizedEmail}. Authority remains inactive until the code is verified.`);
+      setNotice(`Verification code sent to ${normalizedEmail}. The administrator must verify it and create a password before access activates.`);
       setInviteName("");
       setInviteEmail("");
       setInvitePhone("");
       setInviteRoles([]);
     }
-    await load();
+    await load(selectedId);
     setInviting(false);
   }
 
@@ -188,12 +270,15 @@ export default function AdminUsersPage() {
       <AdminSidebar active="users" roles={roles} />
       <section className="admin-main">
         <header className="admin-page-heading">
-          <div><p className="eyebrow">Security & team access</p><h1>Admin users & authority</h1><p>Invite staff using email and phone number, then activate only the operational authority they verify.</p></div>
-          <button className="secondary-button" type="button" onClick={() => void load()} disabled={loading}><RefreshCw /> Refresh</button>
+          <div><p className="eyebrow">Security & team access</p><h1>Admin users & authority</h1><p>Only the Super Admin can add, view, edit, deactivate, reset or delete other administrator accounts.</p></div>
+          <button className="secondary-button" type="button" onClick={() => void load(selectedId)} disabled={loading}><RefreshCw /> Refresh</button>
         </header>
 
+        {error ? <p className="admin-notice admin-error-notice" role="alert">{error}</p> : null}
+        {notice ? <p className="admin-notice admin-success-notice" role="status">{notice}</p> : null}
+
         <section className="admin-invite-card">
-          <header><MailPlus /><div><p className="eyebrow">New administrator</p><h2>Invite staff and assign authority</h2><p>The selected roles stay pending until the recipient verifies the one-time code sent to their email.</p></div></header>
+          <header><MailPlus /><div><p className="eyebrow">New administrator</p><h2>Invite staff and assign authority</h2><p>The recipient verifies their email and creates a password before the selected roles become active.</p></div></header>
           <div className="admin-invite-fields">
             <label>Full name<input value={inviteName} onChange={(event) => setInviteName(event.target.value)} placeholder="Staff member’s name" /></label>
             <label>Email address<input type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="name@example.com" /></label>
@@ -201,15 +286,13 @@ export default function AdminUsersPage() {
           </div>
           <div className="admin-invite-roles">
             <p>Select one or more areas of authority</p>
-            <div>{ADMIN_ROLES.map((role) => {
+            <div>{MANAGEABLE_ADMIN_ROLES.map((role) => {
               const detail = ADMIN_ROLE_DETAILS[role];
               const checked = inviteRoles.includes(role);
               return <button className={checked ? "selected" : ""} type="button" key={role} onClick={() => toggleInviteRole(role)} aria-pressed={checked}><span>{checked ? <Check /> : null}</span><strong>{detail.label}</strong><small>{detail.areas.slice(0, 3).join(" • ")}</small></button>;
             })}</div>
           </div>
-          {error ? <p className="auth-message auth-error" role="alert">{error}</p> : null}
-          {notice ? <p className="auth-message auth-notice" role="status">{notice}</p> : null}
-          <footer><p><ShieldCheck /> No role becomes active before email verification.</p><button className="primary-button" type="button" onClick={() => void sendInvitation()} disabled={inviting}>{inviting ? <LoaderCircle className="admin-spinner" /> : <Send />} Send verification code</button></footer>
+          <footer><p><ShieldCheck /> The protected Super Admin role cannot be assigned here.</p><button className="primary-button" type="button" onClick={() => void sendInvitation()} disabled={inviting}>{inviting ? <LoaderCircle className="admin-spinner" /> : <Send />} Send verification code</button></footer>
         </section>
 
         {invitations.length ? <section className="admin-pending-invitations">
@@ -223,33 +306,51 @@ export default function AdminUsersPage() {
 
         <div className="admin-authority-layout">
           <aside className="admin-authority-users">
-            <label><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name or email" /></label>
+            <label><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search admin profiles" /></label>
             <div>
               {filtered.map((account) => (
                 <button className={account.user_id === selectedId ? "selected" : ""} type="button" key={account.user_id} onClick={() => selectAccount(account)}>
                   <span><strong>{account.full_name || "Unnamed account"}</strong><small>{account.email}</small></span>
-                  <em>{account.roles.filter((role) => (ADMIN_ROLES as readonly string[]).includes(role)).length} roles</em>
+                  <em>{account.roles.includes("super_admin") ? "Protected" : account.is_active ? "Active" : "Inactive"}</em>
                 </button>
               ))}
-              {!filtered.length ? <p>No matching account.</p> : null}
+              {!filtered.length ? <p>No matching administrator.</p> : null}
             </div>
           </aside>
 
           <section className="admin-authority-editor">
             {selected ? <>
-              <header><UserCog /><div><p className="eyebrow">Selected staff account</p><h2>{selected.full_name || selected.email}</h2><span>{selected.email}</span></div></header>
-              <div className="admin-role-grid">
-                {ADMIN_ROLES.map((role) => {
-                  const detail = ADMIN_ROLE_DETAILS[role];
-                  const checked = draftRoles.includes(role);
-                  return <button className={checked ? "selected" : ""} type="button" key={role} onClick={() => toggleRole(role)} aria-pressed={checked}>
-                    <span className="admin-role-check">{checked ? <Check /> : null}</span>
-                    <span><strong>{detail.label}</strong><small>{detail.description}</small><em>{detail.areas.join(" • ")}</em></span>
-                  </button>;
-                })}
-              </div>
-              <div className="admin-authority-actions"><p><ShieldCheck /> Changes apply the next time this user opens an admin page.</p><button className="primary-button" type="button" onClick={() => void save()} disabled={saving}>{saving ? <LoaderCircle className="admin-spinner" /> : <Save />} Save authority</button></div>
-            </> : <div className="admin-authority-empty"><UsersRound /><h2>Select an account</h2><p>Choose a registered khetE account to assign administration authority.</p></div>}
+              <header><UserCog /><div><p className="eyebrow">Selected administrator profile</p><h2>{selected.full_name || selected.email}</h2><span>{selected.email}</span></div></header>
+
+              {protectedAccount ? <div className="admin-protected-account"><ShieldCheck /><span><strong>Protected Super Admin account</strong><p>This profile remains visible for accountability, but it cannot be edited, deleted, demoted or sent a password reset from this page.</p></span></div> : <>
+                <div className="admin-profile-fields">
+                  <label>Full name<input value={draftName} onChange={(event) => setDraftName(event.target.value)} /></label>
+                  <label>Email address<input value={selected.email} readOnly aria-readonly="true" /></label>
+                  <label>Phone number<input type="tel" value={draftPhone} onChange={(event) => setDraftPhone(event.target.value)} /></label>
+                  <label className="admin-active-control">
+                    <span>{draftActive ? <UserCheck /> : <UserX />}<strong>{draftActive ? "Active administrator" : "Administrator deactivated"}</strong></span>
+                    <input type="checkbox" checked={draftActive} onChange={(event) => setDraftActive(event.target.checked)} />
+                  </label>
+                </div>
+
+                <div className="admin-role-grid">
+                  {MANAGEABLE_ADMIN_ROLES.map((role) => {
+                    const detail = ADMIN_ROLE_DETAILS[role];
+                    const checked = draftRoles.includes(role);
+                    return <button className={checked ? "selected" : ""} type="button" key={role} onClick={() => toggleRole(role)} aria-pressed={checked}>
+                      <span className="admin-role-check">{checked ? <Check /> : null}</span>
+                      <span><strong>{detail.label}</strong><small>{detail.description}</small><em>{detail.areas.join(" • ")}</em></span>
+                    </button>;
+                  })}
+                </div>
+
+                <div className="admin-account-management-actions">
+                  <button className="secondary-button" type="button" onClick={() => void requestPasswordReset()} disabled={Boolean(action)}>{action === "reset" ? <LoaderCircle className="admin-spinner" /> : <KeyRound />} Send password reset</button>
+                  <button className="danger-button" type="button" onClick={() => void deleteAccount()} disabled={Boolean(action)}>{action === "delete" ? <LoaderCircle className="admin-spinner" /> : <Trash2 />} Delete administrator</button>
+                </div>
+                <div className="admin-authority-actions"><p><ShieldCheck /> Permissions are enforced by the database as well as the interface.</p><button className="primary-button" type="button" onClick={() => void save()} disabled={Boolean(action)}>{action === "save" ? <LoaderCircle className="admin-spinner" /> : <Save />} Save profile & authority</button></div>
+              </>}
+            </> : <div className="admin-authority-empty"><UsersRound /><h2>Select an account</h2><p>Choose an administrator profile to review or update.</p></div>}
           </section>
         </div>
       </section>

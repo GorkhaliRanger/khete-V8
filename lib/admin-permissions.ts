@@ -9,6 +9,16 @@ export const ADMIN_ROLES = [
 
 export type AdminRole = (typeof ADMIN_ROLES)[number];
 
+export const MANAGEABLE_ADMIN_ROLES = [
+  "product_inventory_manager",
+  "order_delivery_manager",
+  "customer_support",
+  "finance_manager",
+  "content_promotion_manager",
+] as const;
+
+export type ManageableAdminRole = (typeof MANAGEABLE_ADMIN_ROLES)[number];
+
 export const ADMIN_ROLE_DETAILS: Record<AdminRole, { label: string; description: string; areas: string[] }> = {
   super_admin: {
     label: "Super Admin",

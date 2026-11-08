@@ -21,6 +21,7 @@ function AdminLoginForm() {
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState("");
   const destination = safeDestination(searchParams.get("next"));
+  const switchingAccount = searchParams.get("switch") === "1";
 
   useEffect(() => {
     let active = true;
@@ -28,6 +29,11 @@ function AdminLoginForm() {
       const supabase = createClient();
       const { data } = await supabase.auth.getUser();
       if (!active) return;
+      if (switchingAccount) {
+        if (data.user) await supabase.auth.signOut();
+        if (active) setChecking(false);
+        return;
+      }
       if (!data.user) {
         setChecking(false);
         return;
@@ -43,7 +49,7 @@ function AdminLoginForm() {
     }
     void checkExistingSession();
     return () => { active = false; };
-  }, [destination, router]);
+  }, [destination, router, switchingAccount]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -71,6 +77,22 @@ function AdminLoginForm() {
     router.refresh();
   }
 
+  async function continueWithGoogle() {
+    setSubmitting(true);
+    setError("");
+    const supabase = createClient();
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(destination)}`,
+      },
+    });
+    if (oauthError) {
+      setError(oauthError.message);
+      setSubmitting(false);
+    }
+  }
+
   return (
     <main className="admin-login-page">
       <header className="admin-login-header">
@@ -89,14 +111,16 @@ function AdminLoginForm() {
           <p className="eyebrow">khetE administration</p>
           <h2>Admin login</h2>
           <p>Use the email and password of an authorised staff account.</p>
-          {checking ? <div className="admin-login-check"><LoaderCircle className="admin-spinner" /> Checking current session…</div> : (
+          {checking ? <div className="admin-login-check"><LoaderCircle className="admin-spinner" /> Checking current session…</div> : <>
             <form onSubmit={submit}>
               <label>Email address<span className="input-with-icon"><Mail /><input type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="admin@khete.com" required /></span></label>
               <label>Password<span className="input-with-icon"><input type={showPassword ? "text" : "password"} autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Your password" required /><button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? <EyeOff /> : <Eye />}</button></span></label>
               {error ? <p className="auth-message auth-error" role="alert">{error}</p> : null}
               <button className="primary-button admin-login-submit" type="submit" disabled={submitting}>{submitting ? <><LoaderCircle className="admin-spinner" /> Verifying access…</> : "Sign in to Admin"}</button>
             </form>
-          )}
+            <div className="auth-divider"><span>or</span></div>
+            <button className="google-button" type="button" onClick={() => void continueWithGoogle()} disabled={submitting}><span>G</span> Continue with Google — no password needed</button>
+          </>}
           <p className="admin-login-help">Admin registration is disabled. New staff accounts and authority must be approved by the Super Admin.</p>
         </div>
       </section>
