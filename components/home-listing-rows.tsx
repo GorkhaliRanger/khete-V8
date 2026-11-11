@@ -320,26 +320,87 @@ export function HomeDealsSection() {
 }
 
 const MOBILE_PRODUCT_BATCH = 10;
+const DESKTOP_ROW_BATCH = 4;
 
 function MobileMoreProducts() {
   const { listings, listingsReady } = useMarketplace();
-  const [visibleCount, setVisibleCount] = useState(MOBILE_PRODUCT_BATCH);
+  const [isMobile, setIsMobile] = useState(true);
+  const [mobileVisibleCount, setMobileVisibleCount] = useState(MOBILE_PRODUCT_BATCH);
+  const [desktopRows, setDesktopRows] = useState(DESKTOP_ROW_BATCH);
+  const [desktopColumns, setDesktopColumns] = useState(4);
   const loadMoreRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
   const products = useMemo(() => selectMoreMobileProducts(listings), [listings]);
+  const visibleCount = isMobile ? mobileVisibleCount : desktopRows * desktopColumns;
   const visibleProducts = products.slice(0, visibleCount);
   const hasMore = visibleCount < products.length;
 
   useEffect(() => {
+    const breakpoint = window.matchMedia("(max-width: 640px)");
+    const update = () => setIsMobile(breakpoint.matches);
+    const frame = window.requestAnimationFrame(update);
+    breakpoint.addEventListener("change", update);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      breakpoint.removeEventListener("change", update);
+    };
+  }, []);
+
+  useEffect(() => {
+    const grid = gridRef.current;
+    if (!listingsReady || !grid) return;
+    const measure = () => {
+      // The resolved CSS grid tracks reflect the actual viewport and container.
+      const tracks = window.getComputedStyle(grid).gridTemplateColumns.trim();
+      if (!tracks || tracks === "none") return;
+      setDesktopColumns(Math.max(1, tracks.split(/\s+/).length));
+    };
+    const frame = window.requestAnimationFrame(measure);
+    const resizeObserver = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
+    resizeObserver?.observe(grid);
+    window.addEventListener("resize", measure);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [listingsReady, products.length]);
+
+  useEffect(() => {
     const target = loadMoreRef.current;
-    if (!listingsReady || !hasMore || !target || typeof IntersectionObserver === "undefined") return;
+    if (!isMobile || !listingsReady || !hasMore || !target) return;
+
+    // Older browsers still show the whole catalog without a manual action.
+    if (typeof IntersectionObserver === "undefined") {
+      const timer = window.setTimeout(() => setMobileVisibleCount(products.length), 0);
+      return () => window.clearTimeout(timer);
+    }
+
+    let advanced = false;
+    const revealNext = () => {
+      if (advanced) return;
+      advanced = true;
+      setMobileVisibleCount((count) => Math.min(count + MOBILE_PRODUCT_BATCH, products.length));
+    };
     const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) {
-        setVisibleCount((count) => Math.min(count + MOBILE_PRODUCT_BATCH, products.length));
-      }
-    }, { rootMargin: "240px 0px" });
+      if (entries.some((entry) => entry.isIntersecting)) revealNext();
+    }, { rootMargin: "360px 0px" });
     observer.observe(target);
-    return () => observer.disconnect();
-  }, [hasMore, listingsReady, products.length, visibleCount]);
+    // Scroll/resize also advances the feed if an observer misses a fast scroll.
+    const checkPosition = () => {
+      if (target.getBoundingClientRect().top <= window.innerHeight + 360) revealNext();
+    };
+    window.addEventListener("scroll", checkPosition, { passive: true });
+    window.addEventListener("resize", checkPosition);
+    const frame = window.requestAnimationFrame(checkPosition);
+    return () => {
+      advanced = true;
+      observer.disconnect();
+      window.removeEventListener("scroll", checkPosition);
+      window.removeEventListener("resize", checkPosition);
+      window.cancelAnimationFrame(frame);
+    };
+  }, [hasMore, isMobile, listingsReady, mobileVisibleCount, products.length]);
 
   if (!listingsReady || !products.length) return null;
 
@@ -351,17 +412,19 @@ function MobileMoreProducts() {
             <p className="eyebrow">Keep exploring</p>
             <h2 id="home-mobile-products-title">All marketplace listings</h2>
           </div>
-          <Link className="text-button" href="/products">Browse all <ArrowRight size={17} /></Link>
         </div>
-        <div className="product-grid product-grid-compact">
+        <div className="product-grid product-grid-compact" ref={gridRef}>
           {visibleProducts.map((listing) => <ProductCard key={listing.id} listing={listing} />)}
         </div>
         <p className="home-mobile-products-count" aria-live="polite">
           Showing {visibleProducts.length} of {products.length} listings
         </p>
-        {hasMore ? (
-          <div className="home-mobile-products-more" ref={loadMoreRef}>
-            <button className="secondary-button" type="button" onClick={() => setVisibleCount((count) => Math.min(count + MOBILE_PRODUCT_BATCH, products.length))}>
+        {hasMore && isMobile ? (
+          <div className="home-mobile-products-more" ref={loadMoreRef} role="status">Loading more listings…</div>
+        ) : null}
+        {hasMore && !isMobile ? (
+          <div className="home-desktop-products-more">
+            <button className="secondary-button" type="button" onClick={() => setDesktopRows((rows) => rows + DESKTOP_ROW_BATCH)}>
               Load more listings
             </button>
           </div>

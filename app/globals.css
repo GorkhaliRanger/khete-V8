@@ -4156,3 +4156,121 @@ a.deals-banner { display: block; text-decoration: none; }
     padding-top: 12px;
   }
 }
+
+
+/* Keep exploring belongs to the full homepage, including desktop widths. */
+.home-mobile-products { display: block; }
+.home-mobile-products-more {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 0;
+  color: var(--muted);
+  font-size: .76rem;
+}
+
+
+/* Give Products and Services the same compact two-column mobile cards as Home. */
+@media (max-width: 640px) {
+  .catalog-section:not(.deals-catalog-section) .product-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .catalog-section:not(.deals-catalog-section) .product-card .product-visual {
+    min-height: 0;
+    aspect-ratio: 1;
+  }
+  .catalog-section:not(.deals-catalog-section) .product-card .product-photo img {
+    padding: 8px;
+  }
+  .catalog-section:not(.deals-catalog-section) .product-card-body {
+    padding: 8px 9px 10px;
+  }
+  .catalog-section:not(.deals-catalog-section) .product-card-body .eyebrow {
+    margin-bottom: 4px;
+    font-size: .58rem;
+    font-weight: 400;
+    line-height: 1.25;
+  }
+  .catalog-section:not(.deals-catalog-section) .product-name {
+    min-height: 2.6em;
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    font-family: inherit;
+    font-size: .78rem;
+    font-weight: 400;
+    line-height: 1.3;
+  }
+  .catalog-section:not(.deals-catalog-section) .product-description {
+    min-height: 0;
+    font-size: .7rem;
+    font-weight: 400;
+    line-height: 1.35;
+  }
+  .catalog-section:not(.deals-catalog-section) .price-row {
+    min-height: 0;
+    margin-top: 6px;
+    padding-top: 0;
+  }
+  .catalog-section:not(.deals-catalog-section) .price-row > div {
+    min-width: 0;
+  }
+  .catalog-section:not(.deals-catalog-section) .price-row strong {
+    font-size: .83rem;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+  .catalog-section:not(.deals-catalog-section) .stock-dot {
+    display: none;
+  }
+  .catalog-section:not(.deals-catalog-section) .save-button {
+    top: 6px;
+    right: 6px;
+    width: 28px;
+    height: 28px;
+  }
+  .catalog-section:not(.deals-catalog-section) .product-card-badges {
+    top: 6px;
+    left: 6px;
+    max-width: calc(100% - 39px);
+  }
+  .catalog-section:not(.deals-catalog-section) .deal-pill,
+  .catalog-section:not(.deals-catalog-section) .new-arrival-pill {
+    padding: 4px 5px;
+    font-size: .54rem;
+  }
+  .catalog-section:not(.deals-catalog-section) .product-card-cta {
+    min-height: 34px;
+    margin-top: 8px;
+    padding: 7px 6px;
+    font-size: .68rem;
+    line-height: 1.2;
+  }
+}
+
+/* Keep exploring reveals four actual grid rows at a time on desktop. */
+.home-mobile-products .product-grid-compact {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.home-mobile-products-count {
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: .74rem;
+  text-align: center;
+}
+.home-desktop-products-more { display: flex; justify-content: center; padding-top: 18px; }
+@media (max-width: 900px) {
+  .home-mobile-products .product-grid-compact {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .home-mobile-products .product-grid-compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .home-desktop-products-more { display: none; }
+}
+
