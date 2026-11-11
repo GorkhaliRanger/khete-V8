@@ -321,11 +321,11 @@ export function HomeDealsSection() {
 
 const MOBILE_PRODUCT_BATCH = 10;
 
-function MobileMoreProducts({ excludeIds }: { excludeIds: string[] }) {
+function MobileMoreProducts() {
   const { listings, listingsReady } = useMarketplace();
   const [visibleCount, setVisibleCount] = useState(MOBILE_PRODUCT_BATCH);
   const loadMoreRef = useRef<HTMLDivElement>(null);
-  const products = useMemo(() => selectMoreMobileProducts(listings, excludeIds), [listings, excludeIds]);
+  const products = useMemo(() => selectMoreMobileProducts(listings), [listings]);
   const visibleProducts = products.slice(0, visibleCount);
   const hasMore = visibleCount < products.length;
 
@@ -339,7 +339,7 @@ function MobileMoreProducts({ excludeIds }: { excludeIds: string[] }) {
     }, { rootMargin: "240px 0px" });
     observer.observe(target);
     return () => observer.disconnect();
-  }, [hasMore, listingsReady, products.length]);
+  }, [hasMore, listingsReady, products.length, visibleCount]);
 
   if (!listingsReady || !products.length) return null;
 
@@ -349,7 +349,7 @@ function MobileMoreProducts({ excludeIds }: { excludeIds: string[] }) {
         <div className="section-heading">
           <div>
             <p className="eyebrow">Keep exploring</p>
-            <h2 id="home-mobile-products-title">More products</h2>
+            <h2 id="home-mobile-products-title">All marketplace listings</h2>
           </div>
           <Link className="text-button" href="/products">Browse all <ArrowRight size={17} /></Link>
         </div>
@@ -357,12 +357,12 @@ function MobileMoreProducts({ excludeIds }: { excludeIds: string[] }) {
           {visibleProducts.map((listing) => <ProductCard key={listing.id} listing={listing} />)}
         </div>
         <p className="home-mobile-products-count" aria-live="polite">
-          Showing {visibleProducts.length} of {products.length} more products
+          Showing {visibleProducts.length} of {products.length} listings
         </p>
         {hasMore ? (
           <div className="home-mobile-products-more" ref={loadMoreRef}>
             <button className="secondary-button" type="button" onClick={() => setVisibleCount((count) => Math.min(count + MOBILE_PRODUCT_BATCH, products.length))}>
-              Load more products
+              Load more listings
             </button>
           </div>
         ) : null}
@@ -372,7 +372,7 @@ function MobileMoreProducts({ excludeIds }: { excludeIds: string[] }) {
 }
 
 export function HomeListingSections() {
-  const { deals, featured, popular, arrivals } = useHomeSectionData();
+  const { featured, popular, arrivals } = useHomeSectionData();
 
   return (
     <>
@@ -427,12 +427,7 @@ export function HomeListingSections() {
         </section>
       ) : null}
 
-      <MobileMoreProducts excludeIds={[
-        ...deals.map(({ listing }) => listing.id),
-        ...featured.map(({ listing }) => listing.id),
-        ...popular.map(({ listing }) => listing.id),
-        ...arrivals.map((listing) => listing.id),
-      ]} />
+      <MobileMoreProducts />
     </>
   );
 }
