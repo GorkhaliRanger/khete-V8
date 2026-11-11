@@ -23,8 +23,9 @@ import {
 import { AdminAccessCard, type AdminAccessState } from "@/components/admin-access-card";
 import { AdminSidebar } from "@/components/admin-sidebar";
 import { formatNpr } from "@/data/marketplace";
+import { calculateCustomerDues, calculateProductStockValue, formatCompactNpr, type StockListing, type StockVariant } from "@/lib/admin-dashboard-metrics";
 import { isOverduePendingOrder, isPendingOrder, type OrderStatus } from "@/lib/orders";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/admin-client";
 
 const adminRoles = new Set([
   "super_admin",
@@ -56,6 +57,7 @@ type DashboardData = {
   pendingApplications: number;
   activeProfessionals: number;
   pendingPayout: number;
+  productStockValue: number | null;
   publicCertificates: number;
   recentOrders: Array<{ id: string; order_number: string; customer_name: string; status: string; total: number; placed_at: string }>;
   recentSupport: Array<{ id: string; ticket_number: string; subject: string; status: string; priority: string; last_message_at: string }>;
@@ -82,6 +84,7 @@ const emptyDashboard: DashboardData = {
   pendingApplications: 0,
   activeProfessionals: 0,
   pendingPayout: 0,
+  productStockValue: null,
   publicCertificates: 0,
   recentOrders: [],
   recentSupport: [],
@@ -103,6 +106,7 @@ export default function AdminPage() {
   const [data, setData] = useState<DashboardData>(emptyDashboard);
   const [error, setError] = useState("");
   const [unavailable, setUnavailable] = useState<string[]>([]);
+  const [summaryLoaded, setSummaryLoaded] = useState(false);
 
   const loadDashboard = useCallback(async () => {
     setError("");
@@ -116,6 +120,23 @@ export default function AdminPage() {
         return { data: null, count: 0 };
       }
       return { data: result.data, count: result.count ?? 0 };
+    };
+
+    // Financial totals must include every row, rather than the API's default first page.
+    const allRows = async <T,>(label: string, request: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>) => {
+      const rows: T[] = [];
+      const pageSize = 1000;
+      for (let from = 0; ; ) {
+        const result = await request(from, from + pageSize - 1);
+        if (result.error) {
+          unavailableSections.push(label);
+          return { data: null, count: 0 };
+        }
+        if (!result.data?.length) return { data: rows, count: rows.length };
+        rows.push(...result.data);
+        // Advance by the actual page length in case the project has a lower API cap.
+        from += result.data.length;
+      }
     };
 
     try {
@@ -134,24 +155,28 @@ export default function AdminPage() {
         certificates,
         recentOrders,
         recentSupport,
+        stockListings,
+        stockVariants,
       ] = await Promise.all([
         safe("Listings", supabase.from("listings").select("id", { count: "exact", head: true })),
-        safe("Published listings", supabase.from("listings").select("id", { count: "exact", head: true }).eq("status", "published")),
-        safe("Inventory", supabase.from("inventory").select("quantity,reserved_quantity,low_stock_threshold")),
+        safe("Published listings", supabase.from("listings").select("id", { count: "exact", head: true }).eq("status", "active")),
+        allRows("Inventory", (from, to) => supabase.from("inventory").select("listing_id,quantity,reserved_quantity,low_stock_threshold").order("listing_id").range(from, to)),
         safe("Orders", supabase.from("orders").select("id", { count: "exact", head: true })),
-        safe("Open orders", supabase.from("orders").select("id", { count: "exact", head: true }).in("status", ["pending_payment", "confirmed", "processing", "ready_for_dispatch", "shipped", "out_for_delivery"])),
-        safe("Order finance", supabase.from("orders").select("total,status,payment_status,placed_at")),
+        safe("Open orders", supabase.from("orders").select("id", { count: "exact", head: true }).in("status", ["pending_payment", "payment_review", "confirmed", "processing", "ready_for_dispatch", "dispatched"])),
+        allRows("Order finance", (from, to) => supabase.from("orders").select("total,status,payment_status,placed_at").order("id").range(from, to)),
         safe("Support", supabase.from("support_tickets").select("id", { count: "exact", head: true }).in("status", ["open", "in_progress", "awaiting_customer"])),
         safe("Reviews", supabase.from("marketplace_reviews").select("id", { count: "exact", head: true }).in("status", ["pending", "changes_requested"])),
         safe("Applications", supabase.from("professional_applications").select("id", { count: "exact", head: true }).in("status", ["submitted", "under_review", "changes_requested"])),
         safe("Professional profiles", supabase.from("professional_profiles").select("id", { count: "exact", head: true }).eq("status", "active")),
-        safe("Professional finance", supabase.from("professional_earnings").select("gross_amount,platform_commission,net_amount,activity_status,earning_status")),
+        allRows("Professional finance", (from, to) => supabase.from("professional_earnings").select("gross_amount,platform_commission,net_amount,activity_status,earning_status").order("id").range(from, to)),
         safe("Certificates", supabase.from("certificates").select("id", { count: "exact", head: true }).eq("is_public", true)),
         safe("Recent orders", supabase.from("orders").select("id,order_number,customer_name,status,total,placed_at").order("placed_at", { ascending: false }).limit(5)),
         safe("Recent support", supabase.from("support_tickets").select("id,ticket_number,subject,status,priority,last_message_at").order("last_message_at", { ascending: false }).limit(5)),
+        allRows("Product stock value", (from, to) => supabase.from("listings").select("id,kind,status,stock_managed,base_price,offer_title,offer_type,offer_value").in("kind", ["product", "produce", "livestock"]).eq("status", "active").order("id").range(from, to)),
+        allRows("Product options", (from, to) => supabase.from("listing_variants").select("listing_id,price,stock_quantity,is_active,offer_title,offer_type,offer_value").order("id").range(from, to)),
       ]);
 
-      const inventoryRows = (inventory.data ?? []) as Array<{ quantity: number; reserved_quantity: number; low_stock_threshold: number }>;
+      const inventoryRows = (inventory.data ?? []) as Array<{ listing_id: string; quantity: number; reserved_quantity: number; low_stock_threshold: number }>;
       const orderFinanceRows = (orderFinance.data ?? []) as Array<{ total: number; status: string; payment_status: string; placed_at: string }>;
       const professionalFinanceRows = (professionalFinance.data ?? []) as Array<{
         gross_amount: number;
@@ -175,7 +200,7 @@ export default function AdminPage() {
         overduePendingOrders: pendingOrderRows.filter((item) => isOverduePendingOrder(item.placed_at)).length,
         grossOrderValue: activeOrderRows.reduce((sum, item) => sum + Number(item.total), 0),
         paidRevenue: activeOrderRows.filter((item) => item.payment_status === "paid").reduce((sum, item) => sum + Number(item.total), 0),
-        pendingCollection: activeOrderRows.filter((item) => ["unpaid", "pending"].includes(item.payment_status)).reduce((sum, item) => sum + Number(item.total), 0),
+        pendingCollection: calculateCustomerDues(orderFinanceRows),
         refundedOrderValue: orderFinanceRows.filter((item) => item.payment_status === "refunded").reduce((sum, item) => sum + Number(item.total), 0),
         partialRefundOrders: orderFinanceRows.filter((item) => item.payment_status === "partially_refunded").length,
         professionalGross: activeProfessionalRows.reduce((sum, item) => sum + Number(item.gross_amount), 0),
@@ -186,11 +211,15 @@ export default function AdminPage() {
         pendingApplications: applications.count,
         activeProfessionals: professionals.count,
         pendingPayout: activeProfessionalRows.filter((item) => ["pending", "available", "scheduled"].includes(item.earning_status)).reduce((sum, item) => sum + Number(item.net_amount), 0),
+        productStockValue: stockListings.data && stockVariants.data && inventory.data
+          ? calculateProductStockValue(stockListings.data as StockListing[], inventoryRows, stockVariants.data as StockVariant[])
+          : null,
         publicCertificates: certificates.count,
         recentOrders: (recentOrders.data ?? []) as DashboardData["recentOrders"],
         recentSupport: (recentSupport.data ?? []) as DashboardData["recentSupport"],
       });
       setUnavailable([...new Set(unavailableSections)]);
+      setSummaryLoaded(true);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The dashboard could not be loaded.");
     }
@@ -239,22 +268,27 @@ export default function AdminPage() {
     return <AdminAccessCard access={access} email={accountEmail} roles={detectedRoles} origin={currentOrigin} resource="the admin dashboard" error={error} requirement="an active khetE administration role" returnTo="/admin" />;
   }
 
+  const orderAmount = (value: number, compact = false) => !summaryLoaded ? "Loading…" : unavailable.includes("Order finance") ? "Unavailable" : compact ? formatCompactNpr(value) : formatNpr(value);
+  const professionalAmount = (value: number, compact = false) => !summaryLoaded ? "Loading…" : unavailable.includes("Professional finance") ? "Unavailable" : compact ? formatCompactNpr(value) : formatNpr(value);
+  const productAmount = (compact = false) => !summaryLoaded ? "Loading…" : data.productStockValue === null ? "Unavailable" : compact ? formatCompactNpr(data.productStockValue) : formatNpr(data.productStockValue);
+
   return (
     <main className="admin-shell admin-dashboard-page">
-      <AdminSidebar active="dashboard" />
+      <AdminSidebar active="dashboard" roles={detectedRoles} />
       <section className="admin-main">
         {error ? <p className="admin-notice admin-error-notice">{error}</p> : null}
         {unavailable.length ? <p className="admin-dashboard-warning"><AlertTriangle /> Some modules are unavailable: {unavailable.join(", ")}. Confirm their Supabase migrations have been installed.</p> : null}
 
-        <section className="admin-dashboard-hero">
+        <section className="admin-dashboard-hero admin-dashboard-summary" aria-label="Marketplace summary">
           <div
             className={`admin-dashboard-attention ${attentionCount > 0 ? "admin-dashboard-attention-alert" : "admin-dashboard-attention-clear"}`}
             role="status"
             aria-live="polite"
+            title={attentionCount > 0 ? `${attentionCount} operational items require attention: overdue orders, low stock, support, reviews or applications.` : "No open operational items require attention."}
           >
             <div className="admin-dashboard-attention-label">
               {attentionCount > 0 ? <AlertTriangle aria-hidden="true" /> : <BadgeCheck aria-hidden="true" />}
-              <span>{attentionCount > 0 ? "Needs attention" : "All clear"}</span>
+              <span>{attentionCount > 0 ? "Attention" : "All clear"}</span>
             </div>
             <strong>{attentionCount}</strong>
             <p>
@@ -264,8 +298,11 @@ export default function AdminPage() {
             </p>
           </div>
           <div className="admin-dashboard-hero-metrics">
-            <article><CircleDollarSign /><span><small>Paid order value</small><strong>{formatNpr(data.paidRevenue)}</strong></span></article>
-            <article><Banknote /><span><small>Pending professional payout</small><strong>{formatNpr(data.pendingPayout)}</strong></span></article>
+            <Link href="/admin/orders" aria-label={`Paid orders: ${orderAmount(data.paidRevenue)}`} title={`${orderAmount(data.paidRevenue)} — total value of fully paid, non-cancelled orders`}><CircleDollarSign /><span><small>Paid orders</small><strong>{orderAmount(data.paidRevenue, true)}</strong></span></Link>
+            <Link href="/admin/orders" aria-label={`Customer dues: ${orderAmount(data.pendingCollection)}`} title={`${orderAmount(data.pendingCollection)} — outstanding customer payments on non-cancelled, non-returned and non-refunded orders`}><WalletCards /><span><small>Customer dues</small><strong>{orderAmount(data.pendingCollection, true)}</strong></span></Link>
+            <article className="admin-dashboard-metric-unavailable" aria-label="Seller dues: Not recorded. Seller settlements are not tracked in this marketplace yet." title="Seller settlements are not recorded in the current marketplace, so the amount due cannot be calculated."><HandCoins /><span><small>Seller dues</small><strong>Not recorded</strong></span></article>
+            <Link href="/admin/professional-finance" aria-label={`Professional dues: ${professionalAmount(data.pendingPayout)}`} title={`${professionalAmount(data.pendingPayout)} — pending, available and scheduled professional earnings`}><Banknote /><span><small>Professional dues</small><strong>{professionalAmount(data.pendingPayout, true)}</strong></span></Link>
+            <Link href="/admin/listings" aria-label={`Product stock value: ${productAmount()}`} title={`${productAmount()} — available quantities of active stock-managed products, produce and livestock at current selling prices. Excludes reserved stock, services, rentals and untracked or quote-only goods.`}><Package /><span><small>Product stock value</small><strong>{productAmount(true)}</strong></span></Link>
           </div>
         </section>
 
@@ -300,19 +337,19 @@ export default function AdminPage() {
             <article>
               <h3>Marketplace orders</h3>
               <div>
-                <span><small>Gross order value</small><strong>{formatNpr(data.grossOrderValue)}</strong><em>Excludes cancelled orders</em></span>
-                <span><small>Payments received</small><strong>{formatNpr(data.paidRevenue)}</strong><em>Fully paid orders</em></span>
-                <span><small>Pending collection</small><strong>{formatNpr(data.pendingCollection)}</strong><em>Unpaid and pending payments</em></span>
-                <span><small>Refunded order value</small><strong>{formatNpr(data.refundedOrderValue)}</strong><em>{data.partialRefundOrders} partially refunded order{data.partialRefundOrders === 1 ? "" : "s"} tracked separately</em></span>
+                <span><small>Gross order value</small><strong>{orderAmount(data.grossOrderValue)}</strong><em>Excludes cancelled orders</em></span>
+                <span><small>Payments received</small><strong>{orderAmount(data.paidRevenue)}</strong><em>Fully paid orders</em></span>
+                <span><small>Pending collection</small><strong>{orderAmount(data.pendingCollection)}</strong><em>Unpaid, pending or failed payments on active orders</em></span>
+                <span><small>Refunded order value</small><strong>{orderAmount(data.refundedOrderValue)}</strong><em>{data.partialRefundOrders} partially refunded order{data.partialRefundOrders === 1 ? "" : "s"} tracked separately</em></span>
               </div>
             </article>
             <article>
               <h3>Professional services and partners</h3>
               <div>
-                <span><small>Gross activity value</small><strong>{formatNpr(data.professionalGross)}</strong><em>Active, non-reversed records</em></span>
-                <span><small>khetE commission</small><strong>{formatNpr(data.platformCommission)}</strong><em>Recorded platform commission</em></span>
-                <span><small>Pending payouts</small><strong>{formatNpr(data.pendingPayout)}</strong><em>Pending, available or scheduled</em></span>
-                <span><small>Payouts completed</small><strong>{formatNpr(data.professionalPaid)}</strong><em>Net amount marked paid</em></span>
+                <span><small>Gross activity value</small><strong>{professionalAmount(data.professionalGross)}</strong><em>Active, non-reversed records</em></span>
+                <span><small>khetE commission</small><strong>{professionalAmount(data.platformCommission)}</strong><em>Recorded platform commission</em></span>
+                <span><small>Pending payouts</small><strong>{professionalAmount(data.pendingPayout)}</strong><em>Pending, available or scheduled</em></span>
+                <span><small>Payouts completed</small><strong>{professionalAmount(data.professionalPaid)}</strong><em>Net amount marked paid</em></span>
               </div>
             </article>
           </div>

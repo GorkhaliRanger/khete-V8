@@ -10,6 +10,7 @@ export const ADMIN_ROLES = [
 export type AdminRole = (typeof ADMIN_ROLES)[number];
 
 export const MANAGEABLE_ADMIN_ROLES = [
+  "super_admin",
   "product_inventory_manager",
   "order_delivery_manager",
   "customer_support",
@@ -52,10 +53,34 @@ export const ADMIN_ROLE_DETAILS: Record<AdminRole, { label: string; description:
   },
 };
 
+const ADMIN_ROLE_SHORT_LABELS: Record<AdminRole, string> = {
+  super_admin: "Super Admin",
+  product_inventory_manager: "Product & Inventory",
+  order_delivery_manager: "Order & Delivery",
+  customer_support: "Customer Support",
+  finance_manager: "Finance",
+  content_promotion_manager: "Content & Promotion",
+};
+
 export function isAdminRole(value: string): value is AdminRole {
   return (ADMIN_ROLES as readonly string[]).includes(value);
 }
 
 export function hasAdminAccess(roles: readonly string[]) {
   return roles.some(isAdminRole);
+}
+
+export function adminRoleLabels(roles: readonly string[]) {
+  if (roles.includes("super_admin")) return [ADMIN_ROLE_DETAILS.super_admin.label];
+  return ADMIN_ROLES.filter((role) => roles.includes(role))
+    .map((role) => ADMIN_ROLE_DETAILS[role].label);
+}
+
+export function adminRoleCaption(roles: readonly string[]) {
+  const labels = roles.includes("super_admin")
+    ? [ADMIN_ROLE_SHORT_LABELS.super_admin]
+    : ADMIN_ROLES.filter((role) => roles.includes(role))
+      .map((role) => ADMIN_ROLE_SHORT_LABELS[role]);
+  if (!labels.length) return "Administrator";
+  return labels.length === 1 ? labels[0] : `${labels[0]} +${labels.length - 1}`;
 }

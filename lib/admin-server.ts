@@ -1,9 +1,7 @@
 import "server-only";
 
-import { createClient as createAdminClient } from "@supabase/supabase-js";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
-import { createClient } from "@/lib/supabase/server";
-import { getSupabaseConfig } from "@/lib/supabase/config";
+import { createClient } from "@/lib/supabase/admin-server";
 
 const managedAdminRoles = new Set([
   "product_inventory_manager",
@@ -30,11 +28,12 @@ export async function getSuperAdminContext(): Promise<SuperAdminContext | null> 
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData.user) return null;
 
-  const { data: roleRows, error: roleError } = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", authData.user.id);
-  if (roleError || !(roleRows ?? []).some((row) => row.role === "super_admin")) return null;
+  const [{ data: roleRows, error: roleError }, { data: adminProfile, error: profileError }] = await Promise.all([
+    supabase.from("user_roles").select("role").eq("user_id", authData.user.id),
+    supabase.from("admin_profiles").select("is_active").eq("user_id", authData.user.id).maybeSingle(),
+  ]);
+  if (roleError || profileError || !adminProfile?.is_active
+    || !(roleRows ?? []).some((row) => row.role === "super_admin")) return null;
 
   return { supabase, user: authData.user };
 }
@@ -43,31 +42,22 @@ export async function getManagedAdminTarget(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<ManagedAdminTarget | null | "protected"> {
-  const [{ data: profile, error: profileError }, { data: roleRows, error: roleError }] = await Promise.all([
-    supabase.from("profiles").select("id,email,full_name").eq("id", userId).maybeSingle(),
-    supabase.from("user_roles").select("role").eq("user_id", userId),
-  ]);
-  if (profileError || roleError || !profile) return null;
+  const { data, error } = await supabase.rpc("admin_user_directory");
+  if (error) return null;
+  const account = ((data ?? []) as Array<{ user_id: string; email: string; full_name: string; roles: string[] }>).find(
+    (row) => row.user_id === userId,
+  );
+  if (!account) return null;
 
-  const roles = (roleRows ?? []).map((row) => String(row.role));
+  const roles = account.roles.map(String);
   if (roles.includes("super_admin")) return "protected";
   if (!roles.some((role) => managedAdminRoles.has(role))) return null;
 
   return {
-    id: String(profile.id),
-    email: String(profile.email ?? ""),
-    fullName: String(profile.full_name ?? ""),
+    id: account.user_id,
+    email: String(account.email ?? ""),
+    fullName: String(account.full_name ?? ""),
     roles,
   };
 }
 
-export function createSupabaseAdminClient() {
-  const secretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!secretKey) {
-    throw new Error("SUPABASE_SECRET_KEY is not configured on the server.");
-  }
-  const { url } = getSupabaseConfig();
-  return createAdminClient(url, secretKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-}

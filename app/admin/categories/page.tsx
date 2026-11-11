@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Archive, ChevronDown, ChevronRight, Eye, EyeOff, ImagePlus, LoaderCircle, Plus, Save, Tags, Trash2, X } from "lucide-react";
 import { categoryLevelLabel, categoryLevelNumber, categorySelect, slugifyCategory, type CategoryRow } from "@/lib/categories";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/admin-client";
 import { AdminSidebar } from "@/components/admin-sidebar";
 import { SearchableSelect } from "@/components/searchable-select";
 import { safeStorageName, validateStandardImage } from "@/lib/image-processing";

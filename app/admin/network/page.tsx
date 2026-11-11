@@ -48,7 +48,7 @@ import {
   type ProfessionalRole,
   type ProfessionalTone,
 } from "@/lib/professional-network";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/admin-client";
 
 type WorkspaceTab = "applications" | "profiles";
 type ProfileForm = {

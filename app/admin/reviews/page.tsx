@@ -14,7 +14,7 @@ import {
   type ReviewKind,
   type ReviewStatus,
 } from "@/lib/reviews";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/admin-client";
 
 const permittedRoles = new Set([
   "super_admin",

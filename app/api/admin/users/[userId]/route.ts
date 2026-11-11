@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseAdminClient, getManagedAdminTarget, getSuperAdminContext } from "@/lib/admin-server";
+import { getManagedAdminTarget, getSuperAdminContext } from "@/lib/admin-server";
 
 function isSameOrigin(request: NextRequest) {
   const origin = request.headers.get("origin");
@@ -29,21 +29,12 @@ export async function DELETE(
   }
 
   try {
-    const adminClient = createSupabaseAdminClient();
-    const { error: deleteError } = await adminClient.auth.admin.deleteUser(target.id);
+    const { error: deleteError } = await context.supabase.rpc("delete_admin_account", { target_user_id: target.id });
     if (deleteError) throw deleteError;
-
-    await context.supabase.from("admin_audit_log").insert({
-      actor_user_id: context.user.id,
-      target_user_id: target.id,
-      action: "admin_account_deleted",
-      details: { email: target.email, full_name: target.fullName, roles: target.roles },
-    });
 
     return NextResponse.json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "The administrator could not be deleted.";
-    const status = message.includes("SUPABASE_SECRET_KEY") ? 503 : 500;
-    return NextResponse.json({ error: message }, { status });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

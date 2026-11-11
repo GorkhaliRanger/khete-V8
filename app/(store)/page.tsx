@@ -5,11 +5,14 @@ import { IntroGate } from "@/components/intro-gate";
 import { BrandName } from "@/components/brand-name";
 import { HomeDealsSection, HomeListingSections } from "@/components/home-listing-rows";
 import { ProfessionalNetworkPreview } from "@/components/professional-network-preview";
+import { HomeMarquee } from "@/components/home-marquee";
+import { HomeAdBanner } from "@/components/home-ad-banner";
 
 export default function HomePage() {
   return (
-    <main>
+    <main className="home-page">
       <IntroGate />
+      <HomeMarquee />
       <section className="home-hero">
         <div className="site-container hero-layout">
           <div className="hero-copy">
@@ -54,9 +57,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="trust-band">
-        <div className="site-container trust-grid"><div><BadgeCheck /><strong>Clear listing details</strong><span>Specifications, units and availability</span></div><div><Truck /><strong>Delivery that fits</strong><span><BrandName /> and courier fulfilment</span></div><div><PackageCheck /><strong>Support after ordering</strong><span>Tracking, invoices and returns</span></div></div>
-      </section>
+      <HomeAdBanner />
 
       <section className="home-section stories-section">
         <div className="site-container stories-layout">

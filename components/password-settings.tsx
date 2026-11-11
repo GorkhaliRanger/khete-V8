@@ -3,8 +3,9 @@
 import { FormEvent, useEffect, useState } from "react";
 import { CheckCircle2, Eye, EyeOff, KeyRound, LoaderCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { createClient as createAdminClient } from "@/lib/supabase/admin-client";
 
-export function PasswordSettings({ title = "Change password", description = "Update the password used for email sign-in." }: { title?: string; description?: string }) {
+export function PasswordSettings({ title = "Change password", description = "Update the password used for email sign-in.", realm = "customer" }: { title?: string; description?: string; realm?: "customer" | "admin" }) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -16,7 +17,7 @@ export function PasswordSettings({ title = "Change password", description = "Upd
 
   useEffect(() => {
     let mounted = true;
-    const supabase = createClient();
+    const supabase = realm === "admin" ? createAdminClient() : createClient();
     void supabase.auth.getUser().then(({ data }) => {
       if (!mounted) return;
       const providers = Array.isArray(data.user?.app_metadata?.providers)
@@ -25,7 +26,7 @@ export function PasswordSettings({ title = "Change password", description = "Upd
       setGoogleOnly(providers.includes("google") && !providers.includes("email"));
     });
     return () => { mounted = false; };
-  }, []);
+  }, [realm]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -45,7 +46,7 @@ export function PasswordSettings({ title = "Change password", description = "Upd
     }
 
     setBusy(true);
-    const supabase = createClient();
+    const supabase = realm === "admin" ? createAdminClient() : createClient();
     const attributes = currentPassword
       ? { password: newPassword, current_password: currentPassword }
       : { password: newPassword };

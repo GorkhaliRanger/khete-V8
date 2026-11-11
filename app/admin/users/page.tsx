@@ -24,10 +24,12 @@ import { AdminSidebar } from "@/components/admin-sidebar";
 import {
   ADMIN_ROLE_DETAILS,
   MANAGEABLE_ADMIN_ROLES,
+  adminRoleCaption,
+  adminRoleLabels,
   type AdminRole,
   type ManageableAdminRole,
 } from "@/lib/admin-permissions";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/admin-client";
 
 type StaffAccount = {
   user_id: string;
@@ -50,7 +52,7 @@ type PendingInvitation = {
   created_at: string;
 };
 
-type Action = "save" | "reset" | "delete" | "";
+type Action = "save" | "reset" | "delete" | "promote" | "";
 
 function manageableRoles(roles: readonly string[]) {
   return roles.filter((role): role is ManageableAdminRole => (MANAGEABLE_ADMIN_ROLES as readonly string[]).includes(role));
@@ -68,6 +70,7 @@ export default function AdminUsersPage() {
   const [invitePhone, setInvitePhone] = useState("");
   const [inviteRoles, setInviteRoles] = useState<ManageableAdminRole[]>([]);
   const [inviting, setInviting] = useState(false);
+  const [resendingEmail, setResendingEmail] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const [draftName, setDraftName] = useState("");
   const [draftPhone, setDraftPhone] = useState("");
@@ -141,11 +144,11 @@ export default function AdminUsersPage() {
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
     if (!term) return accounts;
-    return accounts.filter((account) => `${account.full_name} ${account.email} ${account.phone}`.toLowerCase().includes(term));
+    return accounts.filter((account) => `${account.full_name} ${account.email} ${account.phone} ${adminRoleLabels(account.roles).join(" ")}`.toLowerCase().includes(term));
   }, [accounts, query]);
 
   function toggleRole(role: ManageableAdminRole) {
-    if (protectedAccount) return;
+    if (protectedAccount || role === "super_admin") return;
     setDraftRoles((current) => current.includes(role) ? current.filter((item) => item !== role) : [...current, role]);
   }
 
@@ -191,33 +194,85 @@ export default function AdminUsersPage() {
     setAction("reset");
     setError("");
     setNotice("");
-    const response = await fetch(`/api/admin/users/${selected.user_id}/password-reset`, { method: "POST" });
-    const result = await response.json() as { error?: string };
-    if (!response.ok) setError(result.error ?? "The password reset could not be sent.");
-    else setNotice(`A secure password-reset link was sent to ${selected.email}.`);
-    setAction("");
+    try {
+      const response = await fetch(`/api/admin/users/${selected.user_id}/password-reset`, { method: "POST" });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "The password reset could not be sent.");
+      setNotice(`A secure password-reset link was sent to ${selected.email}.`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The password reset could not be sent.");
+    } finally {
+      setAction("");
+    }
+  }
+
+  async function promoteToSuperAdmin() {
+    if (!selected || protectedAccount || !selected.is_active) return;
+    if (!window.confirm(`Give ${selected.full_name || selected.email} full Super Admin access? This grants authority over the entire Admin panel and existing Super Admin accounts cannot be demoted here.`)) return;
+    setAction("promote");
+    setError("");
+    setNotice("");
+    try {
+      const { error: promoteError } = await createClient().rpc("grant_super_admin", { target_user_id: selected.user_id });
+      if (promoteError) throw promoteError;
+      setNotice(`${selected.full_name || selected.email} now has Super Admin authority.`);
+      await load(selected.user_id);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Super Admin authority could not be assigned.");
+    } finally {
+      setAction("");
+    }
   }
 
   async function deleteAccount() {
     if (!selected || protectedAccount) return;
-    const confirmed = window.confirm(`Permanently delete the administrator account for ${selected.full_name || selected.email}? This cannot be undone.`);
+    const confirmed = window.confirm(`Delete the Admin profile and authority for ${selected.full_name || selected.email}? Their customer account and orders will remain unchanged.`);
     if (!confirmed) return;
 
     setAction("delete");
     setError("");
     setNotice("");
-    const response = await fetch(`/api/admin/users/${selected.user_id}`, { method: "DELETE" });
-    const result = await response.json() as { error?: string };
-    if (!response.ok) setError(result.error ?? "The administrator could not be deleted.");
-    else {
-      setNotice(`${selected.full_name || selected.email} was deleted.`);
+    try {
+      const response = await fetch(`/api/admin/users/${selected.user_id}`, { method: "DELETE" });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "The administrator could not be deleted.");
+      setNotice(`Admin access was removed for ${selected.full_name || selected.email}.`);
       await load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The administrator could not be deleted.");
+    } finally {
+      setAction("");
     }
-    setAction("");
   }
 
   function toggleInviteRole(role: ManageableAdminRole) {
-    setInviteRoles((current) => current.includes(role) ? current.filter((item) => item !== role) : [...current, role]);
+    setInviteRoles((current) => role === "super_admin"
+      ? (current.includes(role) ? [] : [role])
+      : (current.includes(role) ? current.filter((item) => item !== role) : [...current.filter((item) => item !== "super_admin"), role]));
+  }
+
+  async function emailInvitationLink(address: string) {
+    const response = await fetch("/api/admin/users/send-invitation-link", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: address }),
+    });
+    const result = await response.json() as { error?: string };
+    if (!response.ok) throw new Error(result.error || "The activation email could not be sent.");
+  }
+
+  async function resendInvitation(address: string) {
+    setResendingEmail(address);
+    setError("");
+    setNotice("");
+    try {
+      await emailInvitationLink(address);
+      setNotice(`A fresh activation link was sent to ${address}.`);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The activation email could not be sent.");
+    } finally {
+      setResendingEmail("");
+    }
   }
 
   async function sendInvitation() {
@@ -241,21 +296,15 @@ export default function AdminUsersPage() {
       setInviting(false);
       return;
     }
-    const { error: otpError } = await supabase.auth.signInWithOtp({
-      email: normalizedEmail,
-      options: {
-        shouldCreateUser: true,
-        emailRedirectTo: `${window.location.origin}/admin/verify?email=${encodeURIComponent(normalizedEmail)}`,
-      },
-    });
-    if (otpError) {
-      setError(`The invitation was saved, but the email code could not be sent: ${otpError.message}`);
-    } else {
-      setNotice(`Verification code sent to ${normalizedEmail}. The administrator must verify it and create a password before access activates.`);
+    try {
+      await emailInvitationLink(normalizedEmail);
+      setNotice(`Activation link sent to ${normalizedEmail}. The recipient creates their own password after opening it, then signs in at /admin/login.`);
       setInviteName("");
       setInviteEmail("");
       setInvitePhone("");
       setInviteRoles([]);
+    } catch (caught) {
+      setError(`The invitation was saved, but the activation link could not be sent: ${caught instanceof Error ? caught.message : "Try Resend activation link below."}`);
     }
     await load(selectedId);
     setInviting(false);
@@ -270,7 +319,7 @@ export default function AdminUsersPage() {
       <AdminSidebar active="users" roles={roles} />
       <section className="admin-main">
         <header className="admin-page-heading">
-          <div><p className="eyebrow">Security & team access</p><h1>Admin users & authority</h1><p>Only the Super Admin can add, view, edit, deactivate, reset or delete other administrator accounts.</p></div>
+          <div><p className="eyebrow">Security & team access</p><h1>Admin users & authority</h1><p>Super Admins can invite staff, assign departments or additional Super Admins, and manage other administrator accounts.</p></div>
           <button className="secondary-button" type="button" onClick={() => void load(selectedId)} disabled={loading}><RefreshCw /> Refresh</button>
         </header>
 
@@ -278,7 +327,7 @@ export default function AdminUsersPage() {
         {notice ? <p className="admin-notice admin-success-notice" role="status">{notice}</p> : null}
 
         <section className="admin-invite-card">
-          <header><MailPlus /><div><p className="eyebrow">New administrator</p><h2>Invite staff and assign authority</h2><p>The recipient verifies their email and creates a password before the selected roles become active.</p></div></header>
+          <header><MailPlus /><div><p className="eyebrow">New administrator</p><h2>Invite staff and assign authority</h2><p>The recipient opens an email verification link and creates their own password before access activates. Passwords are never shown to other administrators.</p></div></header>
           <div className="admin-invite-fields">
             <label>Full name<input value={inviteName} onChange={(event) => setInviteName(event.target.value)} placeholder="Staff member’s name" /></label>
             <label>Email address<input type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="name@example.com" /></label>
@@ -292,7 +341,7 @@ export default function AdminUsersPage() {
               return <button className={checked ? "selected" : ""} type="button" key={role} onClick={() => toggleInviteRole(role)} aria-pressed={checked}><span>{checked ? <Check /> : null}</span><strong>{detail.label}</strong><small>{detail.areas.slice(0, 3).join(" • ")}</small></button>;
             })}</div>
           </div>
-          <footer><p><ShieldCheck /> The protected Super Admin role cannot be assigned here.</p><button className="primary-button" type="button" onClick={() => void sendInvitation()} disabled={inviting}>{inviting ? <LoaderCircle className="admin-spinner" /> : <Send />} Send verification code</button></footer>
+          <footer><p><ShieldCheck /> Super Admin grants full panel access. Select it alone.</p><button className="primary-button" type="button" onClick={() => void sendInvitation()} disabled={inviting}>{inviting ? <LoaderCircle className="admin-spinner" /> : <Send />} Send activation link</button></footer>
         </section>
 
         {invitations.length ? <section className="admin-pending-invitations">
@@ -300,7 +349,7 @@ export default function AdminUsersPage() {
           <div>{invitations.map((invitation) => <article key={invitation.id}>
             <Clock3 />
             <div><strong>{invitation.full_name}</strong><span>{invitation.email} · {invitation.phone}</span><small>{invitation.roles.map((role) => ADMIN_ROLE_DETAILS[role as AdminRole]?.label ?? role).join(" • ")}</small></div>
-            <em>Pending verification</em>
+            <div className="admin-invitation-actions"><em>Pending verification</em><button className="secondary-button" type="button" onClick={() => void resendInvitation(invitation.email)} disabled={Boolean(resendingEmail) || inviting}>{resendingEmail === invitation.email ? <LoaderCircle className="admin-spinner" /> : <Send />} Resend link</button></div>
           </article>)}</div>
         </section> : null}
 
@@ -311,10 +360,10 @@ export default function AdminUsersPage() {
               {filtered.map((account) => (
                 <button className={account.user_id === selectedId ? "selected" : ""} type="button" key={account.user_id} onClick={() => selectAccount(account)}>
                   <span><strong>{account.full_name || "Unnamed account"}</strong><small>{account.email}</small></span>
-                  <em>{account.roles.includes("super_admin") ? "Protected" : account.is_active ? "Active" : "Inactive"}</em>
+                  <em title={adminRoleLabels(account.roles).join(" • ")}>{account.is_active ? adminRoleCaption(account.roles) : "Inactive"}</em>
                 </button>
               ))}
-              {!filtered.length ? <p>No matching administrator.</p> : null}
+              {!filtered.length ? <p>{loading ? "Loading administrator profiles…" : error && !accounts.length ? "Administrator profiles could not be loaded. Use Refresh to try again." : "No matching administrator."}</p> : null}
             </div>
           </aside>
 
@@ -322,7 +371,7 @@ export default function AdminUsersPage() {
             {selected ? <>
               <header><UserCog /><div><p className="eyebrow">Selected administrator profile</p><h2>{selected.full_name || selected.email}</h2><span>{selected.email}</span></div></header>
 
-              {protectedAccount ? <div className="admin-protected-account"><ShieldCheck /><span><strong>Protected Super Admin account</strong><p>This profile remains visible for accountability, but it cannot be edited, deleted, demoted or sent a password reset from this page.</p></span></div> : <>
+              {protectedAccount ? <div className="admin-protected-account"><ShieldCheck /><span><strong>Super Admin · Full administration access</strong><p>Super Admins control every area of the Admin panel, including administrator profiles and authority. Existing Super Admin accounts cannot be edited, deleted, demoted or sent a password reset from this page. Their owners can update their own details in Profile & settings.</p></span></div> : <>
                 <div className="admin-profile-fields">
                   <label>Full name<input value={draftName} onChange={(event) => setDraftName(event.target.value)} /></label>
                   <label>Email address<input value={selected.email} readOnly aria-readonly="true" /></label>
@@ -334,7 +383,7 @@ export default function AdminUsersPage() {
                 </div>
 
                 <div className="admin-role-grid">
-                  {MANAGEABLE_ADMIN_ROLES.map((role) => {
+                  {MANAGEABLE_ADMIN_ROLES.filter((role) => role !== "super_admin").map((role) => {
                     const detail = ADMIN_ROLE_DETAILS[role];
                     const checked = draftRoles.includes(role);
                     return <button className={checked ? "selected" : ""} type="button" key={role} onClick={() => toggleRole(role)} aria-pressed={checked}>
@@ -346,6 +395,7 @@ export default function AdminUsersPage() {
 
                 <div className="admin-account-management-actions">
                   <button className="secondary-button" type="button" onClick={() => void requestPasswordReset()} disabled={Boolean(action)}>{action === "reset" ? <LoaderCircle className="admin-spinner" /> : <KeyRound />} Send password reset</button>
+                  <button className="secondary-button" type="button" onClick={() => void promoteToSuperAdmin()} disabled={Boolean(action) || !selected.is_active} title={selected.is_active ? "Grant full Admin panel authority" : "Activate this administrator before promotion"}>{action === "promote" ? <LoaderCircle className="admin-spinner" /> : <ShieldCheck />} Promote to Super Admin</button>
                   <button className="danger-button" type="button" onClick={() => void deleteAccount()} disabled={Boolean(action)}>{action === "delete" ? <LoaderCircle className="admin-spinner" /> : <Trash2 />} Delete administrator</button>
                 </div>
                 <div className="admin-authority-actions"><p><ShieldCheck /> Permissions are enforced by the database as well as the interface.</p><button className="primary-button" type="button" onClick={() => void save()} disabled={Boolean(action)}>{action === "save" ? <LoaderCircle className="admin-spinner" /> : <Save />} Save profile & authority</button></div>

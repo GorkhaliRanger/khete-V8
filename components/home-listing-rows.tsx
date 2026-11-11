@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, ChevronLeft, ChevronRight, Milk, Pause, Play, Sprout, Tractor, Wheat, Wrench } from "lucide-react";
 import { formatNpr, type Listing } from "@/data/marketplace";
 import { createClient } from "@/lib/supabase/client";
+import { selectMoreMobileProducts } from "@/lib/home-mobile-products";
 import { useMarketplace } from "./marketplace-provider";
 import { ProductCard } from "./product-card";
 import { BrandName } from "./brand-name";
@@ -318,8 +319,60 @@ export function HomeDealsSection() {
   );
 }
 
+const MOBILE_PRODUCT_BATCH = 10;
+
+function MobileMoreProducts({ excludeIds }: { excludeIds: string[] }) {
+  const { listings, listingsReady } = useMarketplace();
+  const [visibleCount, setVisibleCount] = useState(MOBILE_PRODUCT_BATCH);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const products = useMemo(() => selectMoreMobileProducts(listings, excludeIds), [listings, excludeIds]);
+  const visibleProducts = products.slice(0, visibleCount);
+  const hasMore = visibleCount < products.length;
+
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!listingsReady || !hasMore || !target || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setVisibleCount((count) => Math.min(count + MOBILE_PRODUCT_BATCH, products.length));
+      }
+    }, { rootMargin: "240px 0px" });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [hasMore, listingsReady, products.length]);
+
+  if (!listingsReady || !products.length) return null;
+
+  return (
+    <section className="home-section home-mobile-products" aria-labelledby="home-mobile-products-title">
+      <div className="site-container">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Keep exploring</p>
+            <h2 id="home-mobile-products-title">More products</h2>
+          </div>
+          <Link className="text-button" href="/products">Browse all <ArrowRight size={17} /></Link>
+        </div>
+        <div className="product-grid product-grid-compact">
+          {visibleProducts.map((listing) => <ProductCard key={listing.id} listing={listing} />)}
+        </div>
+        <p className="home-mobile-products-count" aria-live="polite">
+          Showing {visibleProducts.length} of {products.length} more products
+        </p>
+        {hasMore ? (
+          <div className="home-mobile-products-more" ref={loadMoreRef}>
+            <button className="secondary-button" type="button" onClick={() => setVisibleCount((count) => Math.min(count + MOBILE_PRODUCT_BATCH, products.length))}>
+              Load more products
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
 export function HomeListingSections() {
-  const { featured, popular, arrivals } = useHomeSectionData();
+  const { deals, featured, popular, arrivals } = useHomeSectionData();
 
   return (
     <>
@@ -373,6 +426,13 @@ export function HomeListingSections() {
           </div>
         </section>
       ) : null}
+
+      <MobileMoreProducts excludeIds={[
+        ...deals.map(({ listing }) => listing.id),
+        ...featured.map(({ listing }) => listing.id),
+        ...popular.map(({ listing }) => listing.id),
+        ...arrivals.map((listing) => listing.id),
+      ]} />
     </>
   );
 }

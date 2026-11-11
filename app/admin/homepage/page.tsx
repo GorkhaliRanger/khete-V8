@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Copy, ImagePlus, LoaderCircle, Pencil, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { AdminAccessCard, type AdminAccessState } from "@/components/admin-access-card";
+import { AdminHomeAdEditor } from "@/components/admin-home-ad-editor";
 import { AdminSidebar } from "@/components/admin-sidebar";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/admin-client";
 
 type HighlightSection = "deals" | "featured" | "popular";
 
@@ -305,13 +306,15 @@ export default function AdminHomepagePage() {
         <header className="admin-page-heading">
           <div>
             <p className="eyebrow">Storefront</p>
-            <h1>Homepage Highlights</h1>
-            <p>Choose exactly which listings appear in the homepage sections. Empty sections fall back to their automatic behaviour.</p>
+            <h1>Homepage Highlights &amp; Promotions</h1>
+            <p>Choose homepage listings and, if you manage content, edit the promotional banner. Empty listing sections use their automatic behaviour.</p>
           </div>
           <div className="admin-create-actions">
             <button type="button" onClick={() => void run(loadPicks, "Refreshed.")} disabled={saving || tableMissing}><RefreshCw /> Refresh</button>
           </div>
         </header>
+
+        {detectedRoles.some((role) => role === "super_admin" || role === "content_promotion_manager") ? <AdminHomeAdEditor /> : null}
 
         {tableMissing ? (
           <div className="admin-form" style={{ display: "grid", gap: 14, marginBottom: 22 }}>

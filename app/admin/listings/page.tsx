@@ -6,7 +6,7 @@ import { AlertCircle, Archive, BadgePercent, Boxes, CheckCircle2, ImagePlus, Pac
 import { AdminSidebar } from "@/components/admin-sidebar";
 import { categoryLevelLabel, categorySelect, type CategoryRow } from "@/lib/categories";
 import { listingSelect, listingVariantSelect, slugifyListing, type ListingImageRow, type ListingRow, type ListingStatus, type ListingVariantRow } from "@/lib/listings";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/admin-client";
 import type { ListingType } from "@/data/marketplace";
 import { SearchableSelect } from "@/components/searchable-select";
 import { safeStorageName, validateStandardImage } from "@/lib/image-processing";

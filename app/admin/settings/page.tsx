@@ -4,14 +4,26 @@
 
 import { ChangeEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ImagePlus, LoaderCircle, LogOut, RefreshCw, Save, Settings, ShieldCheck, Trash2 } from "lucide-react";
+import { ImagePlus, LoaderCircle, Pencil, RefreshCw, Save, ShieldCheck, Trash2, X } from "lucide-react";
 import { AdminAccessCard, type AdminAccessState } from "@/components/admin-access-card";
 import { AdminSidebar } from "@/components/admin-sidebar";
-import { PasswordSettings } from "@/components/password-settings";
-import { hasAdminAccess } from "@/lib/admin-permissions";
-import { createClient } from "@/lib/supabase/client";
+import { AdminPasswordDialog } from "@/components/admin-password-dialog";
+import { useAdminProfilePhoto } from "@/components/use-admin-profile-photo";
+import { adminRoleLabels, hasAdminAccess } from "@/lib/admin-permissions";
+import { adminSettingsReturnPath } from "@/lib/admin-settings-navigation";
+import { createClient } from "@/lib/supabase/admin-client";
 
 const avatarBucket = "admin-profile-images";
+type ProfileField = "full_name" | "phone";
+
+function inlineAvatar(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("The profile image could not be read."));
+    reader.readAsDataURL(blob);
+  });
+}
 
 async function prepareAvatar(file: File) {
   const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -68,12 +80,17 @@ export default function AdminSettingsPage() {
   const [roles, setRoles] = useState<string[]>([]);
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [busy, setBusy] = useState<"profile" | "avatar" | "remove-avatar" | "switch" | "logout" | "">("");
+  const [profileReady, setProfileReady] = useState(false);
+  const [editingField, setEditingField] = useState<ProfileField | null>(null);
+  const [draft, setDraft] = useState("");
+  const { photo: avatarUrl, savePhoto } = useAdminProfilePhoto(userId);
+  const [busy, setBusy] = useState<"profile" | "avatar" | "remove-avatar" | "">("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
   const load = useCallback(async () => {
+    setError("");
+    setProfileReady(false);
     const supabase = createClient();
     const { data: authData, error: authError } = await supabase.auth.getUser();
     if (authError) {
@@ -89,12 +106,12 @@ export default function AdminSettingsPage() {
     setUserId(authData.user.id);
     setEmail(authData.user.email ?? "");
     const [profileResult, roleResult] = await Promise.all([
-      supabase.from("profiles").select("full_name,phone,avatar_url").eq("id", authData.user.id).maybeSingle(),
+      supabase.from("admin_profiles").select("full_name,phone,avatar_url").eq("user_id", authData.user.id).maybeSingle(),
       supabase.from("user_roles").select("role").eq("user_id", authData.user.id),
     ]);
-    if (profileResult.error || roleResult.error) {
+    if (roleResult.error) {
       setAccess("error");
-      setError(profileResult.error?.message ?? roleResult.error?.message ?? "The Admin profile could not be loaded.");
+      setError(roleResult.error.message);
       return;
     }
 
@@ -104,9 +121,22 @@ export default function AdminSettingsPage() {
       setAccess("denied");
       return;
     }
-    setFullName(String(profileResult.data?.full_name || authData.user.user_metadata?.full_name || ""));
+    if (profileResult.error) {
+      const missingProfileTable = ["PGRST205", "42P01"].includes(profileResult.error.code)
+        && profileResult.error.message.includes("admin_profiles");
+      if (!missingProfileTable) {
+        setAccess("error");
+        setError(profileResult.error.message);
+        return;
+      }
+      // Keep the verified Admin signed in. A missing profile table is a setup
+      // problem, not a reason to send the user back through authentication.
+      setAccess("allowed");
+      return;
+    }
+    setFullName(String(profileResult.data?.full_name || ""));
     setPhone(String(profileResult.data?.phone || ""));
-    setAvatarUrl(profileResult.data?.avatar_url ? String(profileResult.data.avatar_url) : null);
+    setProfileReady(Boolean(profileResult.data));
     setAccess("allowed");
   }, []);
 
@@ -119,33 +149,50 @@ export default function AdminSettingsPage() {
     window.dispatchEvent(new Event("khete-admin-profile-updated"));
   }
 
-  async function saveProfile() {
-    if (!userId || fullName.trim().length < 2) {
+  function closeSettings() {
+    const returnTo = new URLSearchParams(window.location.search).get("returnTo");
+    router.replace(adminSettingsReturnPath(returnTo, window.location.origin));
+  }
+
+  function editProfile(field: ProfileField) {
+    setDraft(field === "full_name" ? fullName : phone);
+    setEditingField(field);
+    setError("");
+    setNotice("");
+  }
+
+  async function saveProfile(field: ProfileField) {
+    if (!userId || !profileReady || busy) return;
+    const value = draft.trim();
+    if (field === "full_name" && value.length < 2) {
       setError("Enter your full name.");
       return;
     }
     setBusy("profile");
     setError("");
     setNotice("");
-    const supabase = createClient();
-    const { error: profileError } = await supabase.from("profiles").update({
-      full_name: fullName.trim(),
-      phone: phone.trim() || null,
-    }).eq("id", userId);
-    if (!profileError) {
-      await supabase.auth.updateUser({ data: { full_name: fullName.trim() } });
-      setNotice("Admin profile updated.");
+    try {
+      const changes = field === "full_name" ? { full_name: value } : { phone: value || null };
+      const { data, error: profileError } = await createClient().from("admin_profiles")
+        .update(changes).eq("user_id", userId).select("full_name,phone").single();
+      if (profileError) throw profileError;
+      setFullName(String(data.full_name || ""));
+      setPhone(String(data.phone || ""));
+      setEditingField(null);
+      setDraft("");
+      setNotice(field === "full_name" ? "Admin name updated." : "Admin mobile number updated.");
       announceUpdate();
-    } else {
-      setError(profileError.message);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The Admin profile could not be updated. Please try again.");
+    } finally {
+      setBusy("");
     }
-    setBusy("");
   }
 
   async function uploadAvatar(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
-    if (!file) return;
+    if (!file || !profileReady || busy) return;
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
       setError("Choose a JPG, PNG or WebP image.");
       return;
@@ -168,18 +215,23 @@ export default function AdminSettingsPage() {
         contentType: "image/webp",
         upsert: false,
       });
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        // Small avatars can still be saved in the existing profile when the
+        // optional Storage bucket has not been installed yet.
+        if (uploadError.message.toLowerCase().includes("bucket not found")) {
+          await savePhoto(await inlineAvatar(blob));
+          setNotice("Profile image updated.");
+          announceUpdate();
+          return;
+        }
+        throw uploadError;
+      }
 
       const publicUrl = supabase.storage.from(avatarBucket).getPublicUrl(storagePath).data.publicUrl;
       const nextUrl = `${publicUrl}?v=${Date.now()}`;
-      const { error: profileError } = await supabase.from("profiles").update({ avatar_url: nextUrl }).eq("id", userId);
-      if (profileError) {
-        await supabase.storage.from(avatarBucket).remove([storagePath]);
-        throw profileError;
-      }
+      await savePhoto(nextUrl);
 
       const previousPath = storedAvatarPath(avatarUrl);
-      setAvatarUrl(nextUrl);
       if (previousPath) await supabase.storage.from(avatarBucket).remove([previousPath]);
       setNotice("Profile image updated.");
       announceUpdate();
@@ -191,30 +243,21 @@ export default function AdminSettingsPage() {
   }
 
   async function removeAvatar() {
-    if (!userId || !avatarUrl) return;
+    if (!userId || !avatarUrl || !profileReady || busy) return;
     setBusy("remove-avatar");
     setError("");
     setNotice("");
     const supabase = createClient();
-    const { error: profileError } = await supabase.from("profiles").update({ avatar_url: null }).eq("id", userId);
-    if (profileError) {
-      setError(profileError.message);
-    } else {
+    try {
+      await savePhoto(null);
       const previousPath = storedAvatarPath(avatarUrl);
       if (previousPath) await supabase.storage.from(avatarBucket).remove([previousPath]);
-      setAvatarUrl(null);
       setNotice("Profile image removed.");
       announceUpdate();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The profile image could not be removed.");
     }
     setBusy("");
-  }
-
-  async function leaveAdmin(mode: "switch" | "logout") {
-    setBusy(mode);
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.replace(mode === "switch" ? "/admin/login?switch=1" : "/admin/login");
-    router.refresh();
   }
 
   if (access !== "allowed") {
@@ -227,34 +270,45 @@ export default function AdminSettingsPage() {
     <main className="admin-shell admin-settings-page">
       <AdminSidebar active="settings" roles={roles} />
       <section className="admin-main">
-        <header className="admin-page-heading"><div><p className="eyebrow">Signed-in administrator</p><h1>Profile & settings</h1><p>Manage the identity shown throughout the Admin panel and secure this account.</p></div></header>
+        <header className="admin-page-heading admin-settings-heading">
+          <div><p className="eyebrow">Signed-in administrator</p><h1>Profile & settings</h1><p>Manage your Admin profile and secure this account.</p></div>
+          <button className="icon-button admin-settings-close" type="button" onClick={closeSettings} aria-label="Close profile and settings" title="Close profile and settings"><X aria-hidden="true" /></button>
+        </header>
         {error ? <p className="admin-notice admin-error-notice" role="alert">{error}</p> : null}
         {notice ? <p className="admin-notice" role="status">{notice}</p> : null}
+        {!profileReady ? <section className="admin-profile-setup-notice" aria-labelledby="admin-profile-setup-title">
+          <div><strong id="admin-profile-setup-title">Admin profile setup is incomplete</strong><p>You are signed in. Name, mobile number and photo editing will be available once the Admin profile storage is set up. Your email and password settings are available below.</p></div>
+          <button className="secondary-button" type="button" onClick={() => { setAccess("loading"); void load(); }}><RefreshCw /> Check setup again</button>
+        </section> : null}
 
         <div className="admin-settings-grid">
           <section className="admin-settings-card admin-profile-settings-card">
-            <header><ShieldCheck /><div><p className="eyebrow">Admin identity</p><h2>Your profile</h2><p>This name and image identify the person currently operating every Admin page.</p></div></header>
+            <header><ShieldCheck /><div><p className="eyebrow">Admin identity</p><h2>Your profile</h2><p>Your image appears in the Admin header. Hover over it to see your email address.</p></div></header>
             <div className="admin-settings-avatar-row">
               <span className="admin-settings-avatar">{avatarUrl ? <img src={avatarUrl} alt="Your Admin profile" /> : initials}</span>
-              <div><strong>{fullName || "Administrator"}</strong><small>{email}</small><div><button className="secondary-button" type="button" onClick={() => fileInputRef.current?.click()} disabled={Boolean(busy)}>{busy === "avatar" ? <LoaderCircle className="admin-spinner" /> : <ImagePlus />} {avatarUrl ? "Change image" : "Upload image"}</button>{avatarUrl ? <button className="danger-button" type="button" onClick={() => void removeAvatar()} disabled={Boolean(busy)}>{busy === "remove-avatar" ? <LoaderCircle className="admin-spinner" /> : <Trash2 />} Remove</button> : null}</div></div>
-              <input ref={fileInputRef} className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void uploadAvatar(event)} aria-label="Upload Admin profile image" />
+              <div><strong>{fullName || "Administrator"}</strong><span className="admin-profile-role-badge">{adminRoleLabels(roles).join(" • ") || "Administrator"}</span><small>{email}</small><div><button className="secondary-button" type="button" onClick={() => fileInputRef.current?.click()} disabled={Boolean(busy) || !profileReady}>{busy === "avatar" ? <LoaderCircle className="admin-spinner" /> : <ImagePlus />} {avatarUrl ? "Change photo" : "Upload photo"}</button>{avatarUrl ? <button className="danger-button" type="button" onClick={() => void removeAvatar()} disabled={Boolean(busy) || !profileReady}>{busy === "remove-avatar" ? <LoaderCircle className="admin-spinner" /> : <Trash2 />} Remove</button> : null}</div><small>JPG, PNG or WebP · up to 8 MB</small></div>
+              <input ref={fileInputRef} className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void uploadAvatar(event)} disabled={Boolean(busy) || !profileReady} aria-label="Upload Admin profile image" />
             </div>
-            <div className="admin-settings-fields">
-              <label>Full name<input value={fullName} onChange={(event) => setFullName(event.target.value)} /></label>
-              <label>Email address<input value={email} readOnly aria-readonly="true" /></label>
-              <label>Phone number<input type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} /></label>
-            </div>
-            <button className="primary-button admin-settings-save" type="button" onClick={() => void saveProfile()} disabled={Boolean(busy)}>{busy === "profile" ? <LoaderCircle className="admin-spinner" /> : <Save />} Save profile</button>
-          </section>
-
-          <PasswordSettings title="Change Admin password" description="Change the password for this signed-in administrator. Google sign-in remains available when connected." />
-
-          <section className="admin-settings-card admin-session-settings-card">
-            <header><Settings /><div><p className="eyebrow">Session controls</p><h2>Account access</h2><p>End this session or return to the secure login page to use another Admin account.</p></div></header>
-            <div>
-              <button className="secondary-button" type="button" onClick={() => void leaveAdmin("switch")} disabled={Boolean(busy)}>{busy === "switch" ? <LoaderCircle className="admin-spinner" /> : <RefreshCw />} Sign in to another account</button>
-              <button className="danger-button" type="button" onClick={() => void leaveAdmin("logout")} disabled={Boolean(busy)}>{busy === "logout" ? <LoaderCircle className="admin-spinner" /> : <LogOut />} Log out</button>
-            </div>
+            <dl className="admin-profile-details">
+              {([
+                { field: "full_name", label: "Name", value: fullName, type: "text", autoComplete: "name", maxLength: 100 },
+                { field: "email", label: "Email address", value: email, type: "email", autoComplete: "email", maxLength: 254 },
+                { field: "phone", label: "Mobile number", value: phone, type: "tel", autoComplete: "tel", maxLength: 40 },
+              ] as const).map(({ field, label, value, type, autoComplete, maxLength }) => <div className="admin-profile-detail" key={field}>
+                <dt id={`admin-profile-${field}-label`}>{label}</dt>
+                <dd>{editingField === field ? <form onSubmit={(event) => { event.preventDefault(); if (editingField) void saveProfile(editingField); }}>
+                  <input aria-labelledby={`admin-profile-${field}-label`} type={type} autoComplete={autoComplete} value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={maxLength} required={field === "full_name"} minLength={field === "full_name" ? 2 : undefined} disabled={Boolean(busy)} autoFocus />
+                  <div className="admin-profile-edit-actions">
+                    <button className="primary-button" type="submit" disabled={Boolean(busy)}>{busy === "profile" ? <LoaderCircle className="admin-spinner" /> : <Save />} Save</button>
+                    <button className="secondary-button" type="button" onClick={() => { setEditingField(null); setDraft(""); setError(""); }} disabled={Boolean(busy)}>Cancel</button>
+                  </div>
+                </form> : <>
+                  <p>{field !== "email" && !profileReady ? "Unavailable until setup is complete" : value || "Not added"}</p>
+                  {field !== "email" ? <button className="admin-profile-edit-button" type="button" aria-label={`Edit ${label.toLowerCase()}`} onClick={() => editProfile(field)} disabled={Boolean(busy) || Boolean(editingField) || !profileReady}><Pencil /> Edit</button> : <small>Used to sign in</small>}
+                </>}</dd>
+              </div>)}
+            </dl>
+            <div className="admin-profile-password-action"><AdminPasswordDialog email={email} onChanged={() => { setError(""); setNotice("Password changed successfully."); }} /></div>
           </section>
         </div>
       </section>

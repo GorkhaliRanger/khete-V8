@@ -42,7 +42,7 @@ import {
   type CertificateSubject,
   type CertificateSubjectKind,
 } from "@/lib/certificates";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/admin-client";
 
 type WorkspaceTab = "certificates" | "subjects";
 type CertificateForm = {

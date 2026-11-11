@@ -5,10 +5,10 @@ import { FormEvent, Suspense, useEffect, useState } from "react";
 import { ArrowLeft, Eye, EyeOff, LoaderCircle, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { hasAdminAccess } from "@/lib/admin-permissions";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/admin-client";
 
 function safeDestination(value: string | null) {
-  return value?.startsWith("/admin") && !value.startsWith("//") ? value : "/admin";
+  return value && (value === "/admin" || value.startsWith("/admin/")) && !value.includes("\\") ? value : "/admin";
 }
 
 function AdminLoginForm() {
@@ -30,7 +30,7 @@ function AdminLoginForm() {
       const { data } = await supabase.auth.getUser();
       if (!active) return;
       if (switchingAccount) {
-        if (data.user) await supabase.auth.signOut();
+        if (data.user) await supabase.auth.signOut({ scope: "local" });
         if (active) setChecking(false);
         return;
       }
@@ -68,7 +68,7 @@ function AdminLoginForm() {
     const { data: roleRows, error: roleError } = await supabase.from("user_roles").select("role").eq("user_id", data.user.id);
     const roles = (roleRows ?? []).map((row) => String(row.role));
     if (roleError || !hasAdminAccess(roles)) {
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: "local" });
       setError("This account is valid, but it has not been authorised for khetE administration.");
       setSubmitting(false);
       return;
@@ -84,7 +84,7 @@ function AdminLoginForm() {
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(destination)}`,
+        redirectTo: `${window.location.origin}/admin/auth/callback?next=${encodeURIComponent(destination)}`,
       },
     });
     if (oauthError) {

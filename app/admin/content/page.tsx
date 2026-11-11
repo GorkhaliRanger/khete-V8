@@ -15,8 +15,11 @@ import {
   type SitePolicyRow,
   type SitePolicyStatus,
 } from "@/lib/site-policies";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/admin-client";
 import {
+  HOME_MARQUEE_DEFAULT_EN,
+  HOME_MARQUEE_DEFAULT_NE,
+  HOME_MARQUEE_KEY,
   STORY_MARQUEE_DEFAULT_EN,
   STORY_MARQUEE_DEFAULT_NE,
   STORY_MARQUEE_KEY,
@@ -46,6 +49,51 @@ export default function AdminContentPage() {
   const [marquee, setMarquee] = useState({ value_en: STORY_MARQUEE_DEFAULT_EN, value_ne: STORY_MARQUEE_DEFAULT_NE });
   const [marqueeSaving, setMarqueeSaving] = useState(false);
   const [marqueeNotice, setMarqueeNotice] = useState("");
+  const [homeMarquee, setHomeMarquee] = useState({
+    value_en: HOME_MARQUEE_DEFAULT_EN,
+    value_ne: HOME_MARQUEE_DEFAULT_NE,
+  });
+  const [homeMarqueeSaving, setHomeMarqueeSaving] = useState(false);
+  const [homeMarqueeNotice, setHomeMarqueeNotice] = useState("");
+
+  const loadHomeMarquee = useCallback(async () => {
+    const { data, error: loadError } = await createClient().from("site_content")
+      .select(siteContentSelect).eq("key", HOME_MARQUEE_KEY).maybeSingle();
+    if (loadError) {
+      setError(siteContentError(loadError));
+      return;
+    }
+    const row = data as SiteContentRow | null;
+    setHomeMarquee({
+      value_en: row?.value_en?.trim() || HOME_MARQUEE_DEFAULT_EN,
+      value_ne: row ? row.value_ne?.trim() || "" : HOME_MARQUEE_DEFAULT_NE,
+    });
+  }, []);
+
+  async function saveHomeMarquee() {
+    const english = homeMarquee.value_en.trim();
+    if (!english) {
+      setError("The home page marquee needs English text.");
+      return;
+    }
+    setHomeMarqueeSaving(true);
+    setError("");
+    setHomeMarqueeNotice("");
+    const { data, error: saveError } = await createClient().from("site_content")
+      .upsert({
+        key: HOME_MARQUEE_KEY,
+        value_en: english,
+        value_ne: homeMarquee.value_ne.trim() || null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "key" })
+      .select(siteContentSelect).single();
+    setHomeMarqueeSaving(false);
+    if (saveError || !data) {
+      setError(siteContentError(saveError));
+      return;
+    }
+    setHomeMarqueeNotice("Home page marquee updated.");
+  }
 
   const loadMarquee = useCallback(async () => {
     const supabase = createClient();
@@ -136,6 +184,7 @@ export default function AdminContentPage() {
         setAccess("allowed");
         await loadDocuments();
         await loadMarquee();
+        await loadHomeMarquee();
       } catch (caught) {
         if (!mounted) return;
         setError(sitePolicyError(caught));
@@ -144,7 +193,7 @@ export default function AdminContentPage() {
     };
     void checkAccess();
     return () => { mounted = false; };
-  }, [loadDocuments, loadMarquee]);
+  }, [loadDocuments, loadMarquee, loadHomeMarquee]);
 
   useEffect(() => {
     if (!selected?.id) return;
@@ -229,7 +278,19 @@ export default function AdminContentPage() {
 
         <section className="admin-marquee-editor">
           <header>
-            <div><p className="eyebrow">Homepage text</p><h2><Megaphone /> Story page marquee</h2><p>The slim scrolling line at the very top of the Our Story page. Keep it short — one sentence works best.</p></div>
+            <div><p className="eyebrow">Home page</p><h2><Megaphone /> Home page marquee</h2><p>The scrolling line directly below the main menu. English and Nepali text run together; leave Nepali blank to show English only.</p></div>
+            <button className="primary-button" type="button" onClick={() => void saveHomeMarquee()} disabled={homeMarqueeSaving}>{homeMarqueeSaving ? <LoaderCircle className="admin-spinner" /> : <Save />} Save home marquee</button>
+          </header>
+          <div className="form-grid">
+            <label>English text<input value={homeMarquee.value_en} onChange={(event) => setHomeMarquee((current) => ({ ...current, value_en: event.target.value }))} maxLength={220} /></label>
+            <label className="np">नेपाली text<input className="np" value={homeMarquee.value_ne} onChange={(event) => setHomeMarquee((current) => ({ ...current, value_ne: event.target.value }))} maxLength={220} /></label>
+          </div>
+          {homeMarqueeNotice ? <div className="admin-notice">{homeMarqueeNotice}<button type="button" onClick={() => setHomeMarqueeNotice("")}><X /></button></div> : null}
+        </section>
+
+        <section className="admin-marquee-editor">
+          <header>
+            <div><p className="eyebrow">Our Story page</p><h2><Megaphone /> Story page marquee</h2><p>The slim scrolling line at the top of the Our Story page. Keep it short — one sentence works best.</p></div>
             <button className="primary-button" type="button" onClick={() => void saveMarquee()} disabled={marqueeSaving}>{marqueeSaving ? <LoaderCircle className="admin-spinner" /> : <Save />} Save marquee</button>
           </header>
           <div className="form-grid">

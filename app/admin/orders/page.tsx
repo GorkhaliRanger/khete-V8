@@ -7,7 +7,7 @@ import { AdminAccessCard, type AdminAccessState } from "@/components/admin-acces
 import { AdminSidebar } from "@/components/admin-sidebar";
 import { formatNpr } from "@/data/marketplace";
 import { formatOrderDate, isOverduePendingOrder, isPendingOrder, labelOrderDocumentType, labelOrderStatus, labelPaymentStatus, orderDocumentSelect, orderItemSelect, orderSelect, orderStatuses, paymentStatuses, type OrderDocumentRow, type OrderDocumentType, type OrderItemRow, type OrderRow, type OrderStatus, type OrderWithItems, type PaymentStatus } from "@/lib/orders";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/admin-client";
 
 const orderRoles = new Set(["super_admin", "order_delivery_manager", "customer_support", "finance_manager"]);
 

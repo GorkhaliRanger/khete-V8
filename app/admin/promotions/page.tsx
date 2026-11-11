@@ -9,7 +9,7 @@ import { SearchableSelect } from "@/components/searchable-select";
 import { categoryLevelLabel, categorySelect, type CategoryRow } from "@/lib/categories";
 import { safeStorageName, validateStandardImage } from "@/lib/image-processing";
 import { fromDateTimeLocal, promotionSelect, promotionState, toDateTimeLocal, type PromotionRow, type PromotionTarget, type PromotionTheme } from "@/lib/promotions";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/admin-client";
 
 type TargetListing = {
   id: string;

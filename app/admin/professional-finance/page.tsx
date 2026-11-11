@@ -42,7 +42,7 @@ import {
   type ProfessionalOfferingStatus,
 } from "@/lib/professional-finance";
 import { labelProfessionalRole } from "@/lib/professional-network";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/admin-client";
 
 type FinanceTab = "earnings" | "offerings" | "account";
 

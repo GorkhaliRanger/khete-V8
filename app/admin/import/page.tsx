@@ -7,7 +7,7 @@ import { AdminAccessCard, type AdminAccessState } from "@/components/admin-acces
 import { AdminSidebar } from "@/components/admin-sidebar";
 import { categorySelect, type CategoryRow } from "@/lib/categories";
 import { BULK_IMAGE_LIMIT, BULK_IMAGE_SIZE, BULK_WORKBOOK_NAME, prepareBulkImport, type PreparedBulkImport } from "@/lib/bulk-import";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/admin-client";
 
 const catalogRoles = new Set(["super_admin", "product_inventory_manager"]);
 const mediaBucket = "marketplace-media";

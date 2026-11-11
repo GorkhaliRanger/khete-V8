@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getManagedAdminTarget, getSuperAdminContext } from "@/lib/admin-server";
+import { createClient } from "@supabase/supabase-js";
+import { ADMIN_PASSWORD_UPDATE_PATH } from "@/lib/supabase/admin-auth";
+import { getSupabaseConfig } from "@/lib/supabase/config";
 
 function isSameOrigin(request: NextRequest) {
   const origin = request.headers.get("origin");
@@ -28,18 +31,26 @@ export async function POST(
     return NextResponse.json({ error: "The selected administrator has no registered email address." }, { status: 404 });
   }
 
-  const redirectTo = `${request.nextUrl.origin}/auth/callback?next=${encodeURIComponent("/account/update-password")}`;
-  const { error: resetError } = await context.supabase.auth.resetPasswordForEmail(target.email, { redirectTo });
+  const { url, publishableKey } = getSupabaseConfig();
+  // The recipient opens this link in their own browser. A PKCE verifier stored
+  // in the requesting Super Admin's session cannot be used by that recipient.
+  const recoveryClient = createClient(url, publishableKey, {
+    auth: { flowType: "implicit", persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
+  const redirectTo = `${request.nextUrl.origin}${ADMIN_PASSWORD_UPDATE_PATH}`;
+  const { error: resetError } = await recoveryClient.auth.resetPasswordForEmail(target.email, { redirectTo });
   if (resetError) {
     return NextResponse.json({ error: resetError.message }, { status: 400 });
   }
 
-  await context.supabase.from("admin_audit_log").insert({
-    actor_user_id: context.user.id,
+  const { error: auditError } = await context.supabase.rpc("record_admin_password_reset", {
     target_user_id: target.id,
-    action: "admin_password_reset_requested",
-    details: { email: target.email },
   });
+  if (auditError) {
+    return NextResponse.json({
+      error: "The reset email was sent, but the activity record could not be saved. Contact the system administrator.",
+    }, { status: 503 });
+  }
 
   return NextResponse.json({ ok: true });
 }

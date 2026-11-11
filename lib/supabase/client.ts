@@ -9,6 +9,6 @@ export function createClient() {
 
   const { url, publishableKey } = getSupabaseConfig();
 
-  browserClient = createBrowserClient(url, publishableKey);
+  browserClient = createBrowserClient(url, publishableKey, { isSingleton: false });
   return browserClient;
 }

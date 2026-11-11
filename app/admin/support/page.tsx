@@ -23,7 +23,7 @@ import {
   type SupportTicketStatus,
   type SupportTicketType,
 } from "@/lib/support";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/admin-client";
 
 const supportRoles = new Set(["super_admin", "customer_support", "order_delivery_manager"]);
 const attachmentBucket = "support-attachments";

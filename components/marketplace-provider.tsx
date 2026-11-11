@@ -3,8 +3,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
+import { useProfilePhoto } from "@/components/use-profile-photo";
 import { buildCategoryTree, categorySelect, type CategoryRow } from "@/lib/categories";
 import { buildListings, listingSelect, listingVariantSelect, type ListingImageRow, type ListingRow, type ListingVariantRow } from "@/lib/listings";
+import { fetchAllPages } from "@/lib/fetch-all-pages";
 import { isUuid, makeWishlistItemKey, parseWishlistItemKey, wishlistItemSelect, type WishlistItemRow } from "@/lib/wishlist";
 import { categories as fallbackCategories, listings as fallbackListings, type Category, type Listing, type ListingVariant } from "@/data/marketplace";
 
@@ -50,7 +52,8 @@ type MarketplaceContextValue = {
   listingsLive: boolean;
   refreshListings: () => Promise<void>;
   profilePhoto: string | null;
-  setProfilePhoto: (photo: string | null) => void;
+  previousProfilePhoto: string | null;
+  setProfilePhoto: (photo: string | null) => Promise<void>;
 };
 
 const MarketplaceContext = createContext<MarketplaceContextValue | null>(null);
@@ -85,7 +88,7 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
   const [marketplaceListings, setMarketplaceListings] = useState<Listing[]>(fallbackListings);
   const [listingsReady, setListingsReady] = useState(false);
   const [listingsLive, setListingsLive] = useState(false);
-  const [profilePhoto, setProfilePhotoState] = useState<string | null>(null);
+  const { photo: profilePhoto, previousPhoto: previousProfilePhoto, savePhoto: setProfilePhoto } = useProfilePhoto(user?.id);
 
   const refreshMarketplace = useCallback(async () => {
     const supabase = createClient();
@@ -111,38 +114,70 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
     setCategoriesLive(true);
     setCategoriesReady(true);
 
-    const { data: listingData, error: listingError } = await supabase
-      .from("listings")
-      .select(listingSelect)
-      .eq("status", "active")
-      .not("published_at", "is", null)
-      .lte("published_at", new Date().toISOString())
-      .order("featured", { ascending: false })
-      .order("published_at", { ascending: false });
+    // Supabase caps rows in a single response. Page through the full published
+    // catalog so detail pages, cart and wishlist can resolve every homepage card.
+    // A unique final sort keeps offset paging deterministic for equal timestamps.
+    const pageSize = 200;
+    const publicationCutoff = new Date().toISOString();
+    let listingRows: ListingRow[];
+    try {
+      listingRows = await fetchAllPages<ListingRow>(async (from, to) => {
+        const { data, error } = await supabase
+          .from("listings")
+          .select(listingSelect)
+          .eq("status", "active")
+          .not("published_at", "is", null)
+          .lte("published_at", publicationCutoff)
+          .order("featured", { ascending: false })
+          .order("published_at", { ascending: false })
+          .order("id", { ascending: true })
+          .range(from, to);
+        return { data: data as unknown as ListingRow[] | null, error };
+      }, pageSize);
+    } catch {
+      listingRows = [];
+    }
 
-    if (listingError || !listingData?.length) {
+    if (!listingRows.length) {
       setMarketplaceListings(fallbackListings);
       setListingsLive(false);
       setListingsReady(true);
       return;
     }
 
-    const listingRows = listingData as unknown as ListingRow[];
     const listingIds = listingRows.map((listing) => listing.id);
-    const [{ data: imageData }, { data: variantData }] = await Promise.all([
-      supabase
-        .from("listing_images")
-        .select("id,listing_id,storage_path,alt_text_en,alt_text_ne,sort_order,is_primary")
-        .in("listing_id", listingIds)
-        .order("is_primary", { ascending: false })
-        .order("sort_order", { ascending: true }),
-      supabase
-        .from("listing_variants")
-        .select(listingVariantSelect)
-        .in("listing_id", listingIds)
-        .eq("is_active", true)
-        .order("sort_order", { ascending: true }),
-    ]);
+    const imageRows: ListingImageRow[] = [];
+    const variantRows: ListingVariantRow[] = [];
+    // Keep each IN filter bounded. Related rows are paged as well, since a
+    // catalog with many product images or variants can exceed the API row cap.
+    for (let index = 0; index < listingIds.length; index += 50) {
+      const ids = listingIds.slice(index, index + 50);
+      const [imageBatch, variantBatch]: [ListingImageRow[], ListingVariantRow[]] = await Promise.all([
+        fetchAllPages<ListingImageRow>(async (from, to) => {
+          const { data, error } = await supabase
+            .from("listing_images")
+            .select("id,listing_id,storage_path,alt_text_en,alt_text_ne,sort_order,is_primary")
+            .in("listing_id", ids)
+            .order("id", { ascending: true })
+            .range(from, to);
+          return { data: data as unknown as ListingImageRow[] | null, error };
+        }, pageSize).catch(() => [] as ListingImageRow[]),
+        fetchAllPages<ListingVariantRow>(async (from, to) => {
+          const { data, error } = await supabase
+            .from("listing_variants")
+            .select(listingVariantSelect)
+            .in("listing_id", ids)
+            .eq("is_active", true)
+            .order("id", { ascending: true })
+            .range(from, to);
+          return { data: data as unknown as ListingVariantRow[] | null, error };
+        }, pageSize).catch(() => [] as ListingVariantRow[]),
+      ]);
+      // Media can fail independently; keep published goods visible with
+      // their existing icon and base-price fallbacks.
+      imageRows.push(...imageBatch);
+      variantRows.push(...variantBatch);
+    }
     // Site-local image paths (starting with "/") are served from /public directly;
     // everything else is treated as a marketplace-media storage object path.
     const publicImageUrl = (path: string) =>
@@ -152,9 +187,9 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
     setMarketplaceListings(buildListings(
       listingRows,
       rows,
-      (imageData ?? []) as unknown as ListingImageRow[],
+      imageRows,
       publicImageUrl,
-      (variantData ?? []) as unknown as ListingVariantRow[],
+      variantRows,
     ));
     setListingsLive(true);
     setListingsReady(true);
@@ -209,7 +244,6 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
         })) as CartLine[];
         setWishlist(new Set(savedWishlist));
         setCart(savedCart);
-        setProfilePhotoState(localStorage.getItem("khete-profile-photo"));
       } catch {
         localStorage.removeItem("khete-wishlist");
         localStorage.removeItem("khete-cart");
@@ -506,7 +540,7 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
 
   const signOut = useCallback(async (): Promise<AuthResult> => {
     const supabase = createClient();
-    const { error } = await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut({ scope: "local" });
 
     if (error) return { ok: false, message: error.message };
     setWishlist(new Set());
@@ -518,19 +552,10 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
     return { ok: true };
   }, []);
 
-  const setProfilePhoto = useCallback((photo: string | null) => {
-    setProfilePhotoState(photo);
-    try {
-      if (photo) localStorage.setItem("khete-profile-photo", photo);
-      else localStorage.removeItem("khete-profile-photo");
-    } catch {
-      // Photo is kept in memory even if local storage is full.
-    }
-  }, []);
-
   const value = useMemo(
     () => ({
       profilePhoto,
+      previousProfilePhoto,
       setProfilePhoto,
       searchQuery,
       setSearchQuery,
@@ -564,6 +589,7 @@ export function MarketplaceProvider({ children }: { children: React.ReactNode })
     }),
     [
       profilePhoto,
+      previousProfilePhoto,
       setProfilePhoto,
       searchQuery,
       loginOpen,
