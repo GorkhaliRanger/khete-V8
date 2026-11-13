@@ -4274,3 +4274,98 @@ a.deals-banner { display: block; text-decoration: none; }
   .home-desktop-products-more { display: none; }
 }
 
+
+/* Contact & Support: a shorter hero and a legible wordmark used only here. */
+.support-hero { padding: 30px 0 32px; }
+.support-hero-inner > div { max-width: 1100px; }
+.support-hero .eyebrow { margin-bottom: 7px; color: rgba(255,255,255,.86); }
+.support-hero h1 { margin: 0 0 10px; font-size: clamp(2.05rem, 3.35vw, 3.2rem); line-height: 1.12; }
+.support-hero p:not(.eyebrow) { max-width: 760px; font-size: .88rem; line-height: 1.5; }
+.support-hero-brand { display: inline-block; color: #fff; font-family: Arial, Helvetica, sans-serif; font-size: .87em; font-weight: 800; letter-spacing: -.06em; white-space: nowrap; }
+.support-hero-brand strong { color: inherit; font-weight: 850; }
+
+/* Make the dedicated Contact & Support link visible in the main navigation. */
+.nav-contact-link svg { width: 16px; height: 16px; flex: 0 0 auto; }
+
+/* Direct contact methods remain separate from support-ticket history. */
+.support-direct-heading { display: flex; align-items: center; gap: 10px; }
+.support-direct-heading > svg { width: 33px; height: 33px; padding: 7px; flex: 0 0 auto; color: var(--green-650); background: var(--green-100); border-radius: 10px; }
+.support-direct-heading .eyebrow { margin: 0 0 2px; font-size: .58rem; }
+.support-direct-heading h2 { margin: 0; font-family: Georgia, serif; font-size: 1.15rem; font-weight: 500; }
+.support-guidance-card.support-direct-contact > p { margin: 10px 0 0; font-size: .66rem; line-height: 1.55; }
+.support-direct-actions { margin-top: 15px; display: grid; gap: 8px; }
+.support-direct-actions a { width: 100%; min-height: 40px; padding: 7px 12px; font-size: .66rem; text-align: center; }
+.support-direct-actions a svg { width: 16px; height: 16px; flex: 0 0 auto; }
+
+@media (max-width: 900px) {
+  .nav-item > a.nav-contact-link { justify-content: flex-start; gap: 9px; }
+}
+@media (max-width: 600px) {
+  .support-hero { padding: 23px 0 25px; }
+  .support-hero h1 { font-size: clamp(1.95rem, 7vw, 2.5rem); }
+  .support-hero p:not(.eyebrow) { font-size: .78rem; }
+}
+
+/* Our Story keeps its full content while using a tighter editorial rhythm. */
+.story-page .story-title-block { padding: 34px 0 22px; }
+.story-page .story-title-block h1 {
+  max-width: none;
+  margin: 0 auto 12px;
+  font-size: clamp(2.3rem, 4.5vw, 3.45rem);
+  line-height: 1.07;
+}
+.story-page .story-title-intro { font-size: .98rem; line-height: 1.6; }
+.story-page .story-lang-toggle { margin-top: 16px; }
+.story-page .story-why { padding: 28px 0 34px; }
+.story-page .story-why-title {
+  margin-bottom: 12px;
+  font-size: clamp(1.65rem, 2.8vw, 2.3rem);
+}
+.story-page .story-why-body { font-size: 1rem; line-height: 1.65; }
+.story-page :is(
+  .home-section,
+  .story-copy,
+  .story-promise-section,
+  .story-alt-section,
+  .story-founder-section,
+  .milestone-section,
+  .story-roadmap-section
+) { padding: 36px 0; }
+.story-page .story-expert-band { padding: 42px 0; }
+.story-page .story-grid { gap: 30px; }
+.story-page .section-heading { margin-bottom: 18px; }
+.story-page .section-heading h2,
+.story-page .story-grid h2 { font-size: clamp(1.7rem, 2.8vw, 2.45rem); }
+
+/* The marketplace cards are content sized, with less empty space. */
+.story-page .pillars-grid { gap: 12px; }
+.story-page .pillars-grid article { min-height: 172px; padding: 18px 20px; }
+.story-page .pillars-grid svg { width: 24px; height: 24px; margin-bottom: 15px; }
+.story-page .pillars-grid strong { margin-bottom: 7px; font-size: .91rem; }
+.story-page .pillars-grid p { font-size: .79rem; line-height: 1.5; }
+
+/* Join the story reads as a slim closing invitation. */
+.story-page .story-closing { padding: 30px 0 36px; }
+.story-page .story-closing-inner { gap: 18px; }
+.story-page .story-closing h2 {
+  margin-bottom: 6px;
+  font-size: clamp(1.7rem, 2.6vw, 2.3rem);
+}
+.story-page .story-closing-inner > div:first-child > p:not(.eyebrow) {
+  font-size: .88rem;
+  line-height: 1.55;
+}
+.story-page .story-closing-actions { gap: 8px; }
+.story-page .story-closing-actions .primary-button,
+.story-page .story-closing-actions .secondary-button {
+  min-height: 40px;
+  padding: 0 15px;
+  font-size: .8rem;
+}
+@media (max-width: 640px) {
+  .story-page .story-title-block h1 { font-size: clamp(2rem, 8vw, 2.5rem); }
+  .story-page .pillars-grid article { min-height: 0; padding: 16px; }
+  .story-page .pillars-grid svg { margin-bottom: 12px; }
+  .story-page .story-closing { padding: 26px 0 30px; }
+}
+

@@ -61,8 +61,7 @@ export function StoryPageContent() {
 
       <section className="story-title-block">
         <div className="site-container">
-          <p className="eyebrow">{ne ? "हाम्रो कथा" : "Our Story"}</p>
-          <h1>{ne ? "हाम्रो खेतबाट तपाईंको परिवारसम्म — जसको सुरुवात किसानबाटै हुन्छ, अन्त्य पनि किसानमै।" : "From our fields to your family — trade that begins and ends with the farmer."}</h1>
+          <h1>{ne ? "हाम्रो कथा" : "Our Story"}</h1>
           <p className="story-title-intro">{ne ? <><BrandName /> ले नेपालका उपभोक्तालाई किसानसँग सिधै जोड्छ — ताजा, इमानदारीपूर्वक उत्पादित तरकारी र फलफूल, न्यायोचित मूल्यमा, बिचौलियालाई जतिसक्दो हटाएर।</> : <><BrandName /> connects consumers directly to the farmers of Nepal — fresh, honestly grown produce at fair prices, with the middleman taken out wherever we can take him out.</>}</p>
           <div className="story-lang-toggle" role="group" aria-label="Page language">
             <button type="button" className={lang === "en" ? "active" : ""} onClick={() => setLang("en")}>English</button>
@@ -332,7 +331,7 @@ export function StoryPageContent() {
             </article>
             <article>
               <strong>{ne ? "राष्ट्रिय बजार, निर्यातको क्षितिज" : "A national marketplace, an export horizon"}</strong>
-              <p className={ne ? "np" : ""}>{ne ? <>केही जिल्लाबाट पचास र सोभन्दा बढीमा: गहिरो इनभेन्ट्री, छिटो ढुवानी, घर र विदेशका विशेषज्ञता — र नेपालको उत्पादन विश्वभर भरपर्दो र प्रमाणित रूपमा पुग्न बेहोस्ने मापदण्ड, विश्वास र लजिस्टिक।</> : <>From a few districts to fifty and beyond: deeper inventory, faster fulfilment, expertise from home and abroad — and the standards, trust and logistics that let Nepal's produce travel confidently to the world.</>}</p>
+              <p className={ne ? "np" : ""}>{ne ? <>केही जिल्लाबाट पचास र सोभन्दा बढीमा: गहिरो इनभेन्ट्री, छिटो ढुवानी, घर र विदेशका विशेषज्ञता — र नेपालको उत्पादन विश्वभर भरपर्दो र प्रमाणित रूपमा पुग्न बेहोस्ने मापदण्ड, विश्वास र लजिस्टिक।</> : <>From a few districts to fifty and beyond: deeper inventory, faster fulfilment, expertise from home and abroad — and the standards, trust and logistics that let Nepal&apos;s produce travel confidently to the world.</>}</p>
               <span className="roadmap-tag">{ne ? "लक्ष्य" : "The goal"}</span>
             </article>
           </div>

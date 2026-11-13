@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, MessageCircle } from "lucide-react";
+import { WHATSAPP_CHAT_URL } from "@/lib/contact";
 import { BrandName } from "./brand-name";
 
 const groups = [
@@ -22,7 +23,7 @@ export function SiteFooter() {
         <div className="footer-brand">
           <span className="footer-logo" aria-label="khetE" />
           <p>A growing marketplace for agricultural produce, equipment, services and trusted connections across Nepal.</p>
-          <Link className="whatsapp-inline" href="/support?channel=whatsapp"><MessageCircle size={19} /> WhatsApp customer support</Link>
+          <a className="whatsapp-inline" href={WHATSAPP_CHAT_URL} target="_blank" rel="noopener noreferrer"><MessageCircle size={19} aria-hidden="true" /> WhatsApp customer support</a>
         </div>
         {groups.map((group) => (
           <div className="footer-group" key={group.title}>

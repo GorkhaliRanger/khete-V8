@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Headphones,
   Heart,
   Menu,
   Search,
@@ -22,6 +23,7 @@ const navigation = [
   { href: "/services", label: "Services" },
   { href: "/deals", label: "Deals", branded: true },
   { href: "/our-story", label: "Our Story" },
+  { href: "/support", label: "Contact & Support" },
 ];
 
 export function SiteHeader() {
@@ -47,8 +49,8 @@ export function SiteHeader() {
         <nav className={`primary-nav ${mobileOpen ? "is-open" : ""}`} aria-label="Primary navigation">
           {navigation.map((item) => (
             <div className="nav-item" key={item.href}>
-              <Link className={pathname === item.href || (item.href !== "/" && pathname.startsWith(`${item.href}/`)) ? "active" : ""} href={item.href} onClick={() => setMobileOpen(false)}>
-                {item.branded ? <><BrandName /> Deals</> : item.label}
+              <Link className={`${pathname === item.href || (item.href !== "/" && pathname.startsWith(`${item.href}/`)) ? "active" : ""}${item.href === "/support" ? " nav-contact-link" : ""}`} href={item.href} onClick={() => setMobileOpen(false)}>
+                {item.branded ? <><BrandName /> Deals</> : item.href === "/support" ? <><Headphones size={16} aria-hidden="true" />{item.label}</> : item.label}
               </Link>
             </div>
           ))}

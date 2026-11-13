@@ -1,7 +1,7 @@
 "use client";
 
 import { MessageCircle } from "lucide-react";
-import Link from "next/link";
+import { WHATSAPP_CHAT_URL } from "@/lib/contact";
 import { LoginModal } from "./login-modal";
 import { MarketplaceProvider, useMarketplace } from "./marketplace-provider";
 import { SearchResults } from "./search-results";
@@ -15,7 +15,7 @@ function Storefront({ children }: { children: React.ReactNode }) {
       <SiteHeader />
       {searchQuery.trim() ? <SearchResults /> : children}
       <SiteFooter />
-      <Link className="floating-whatsapp" href="/support?channel=whatsapp" title="Customer support"><MessageCircle /><span>Chat</span></Link>
+      <a className="floating-whatsapp" href={WHATSAPP_CHAT_URL} target="_blank" rel="noopener noreferrer" aria-label="Chat with Khet E on WhatsApp" title="Chat with Khet E on WhatsApp"><MessageCircle aria-hidden="true" /><span>Chat</span></a>
       <LoginModal />
     </>
   );

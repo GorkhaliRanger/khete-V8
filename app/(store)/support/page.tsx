@@ -13,6 +13,7 @@ import {
   MessageCircle,
   PackageSearch,
   Paperclip,
+  Phone,
   RefreshCw,
   Send,
   ShieldCheck,
@@ -39,6 +40,7 @@ import {
   type SupportTicketType,
 } from "@/lib/support";
 import { createClient } from "@/lib/supabase/client";
+import { PHONE_CALL_URL, WHATSAPP_CHAT_URL, WHATSAPP_NUMBER } from "@/lib/contact";
 
 type FormState = {
   type: SupportTicketType;
@@ -319,7 +321,7 @@ export default function SupportPage() {
         <div className="site-container support-hero-inner">
           <div>
             <p className="eyebrow">Contact and support</p>
-            <h1>Support for every part of your <BrandName /> journey.</h1>
+            <h1>Support for every part of your <span className="support-hero-brand" aria-label="khet E">khet <strong>E</strong></span> journey.</h1>
             <p>Contact us about products, orders, payments, delivery, custom requests, farmer or business applications, returns, and replacements.</p>
           </div>
         </div>
@@ -397,6 +399,14 @@ export default function SupportPage() {
         </section>
 
         <aside className="support-aside-stack">
+          <section className="support-guidance-card support-direct-contact">
+            <div className="support-direct-heading"><MessageCircle aria-hidden="true" /><div><p className="eyebrow">Talk with us</p><h2>WhatsApp &amp; phone</h2></div></div>
+            <p>Message us on WhatsApp or call {WHATSAPP_NUMBER}. To make a WhatsApp voice call, open the chat and tap its call icon.</p>
+            <div className="support-direct-actions">
+              <a className="primary-button" href={WHATSAPP_CHAT_URL} target="_blank" rel="noopener noreferrer"><MessageCircle aria-hidden="true" />Message on WhatsApp</a>
+              <a className="secondary-button" href={PHONE_CALL_URL}><Phone aria-hidden="true" />Call {WHATSAPP_NUMBER}</a>
+            </div>
+          </section>
           <section className="support-guidance-card featured"><Headphones /><p className="eyebrow">Central support</p><p>All customer, farmer, business, and partner support is coordinated by <BrandName />. Buyers are not connected directly to sellers through support tickets.</p></section>
           <section className="support-guidance-card"><Clock3 /><p className="eyebrow">Response priorities</p><dl><div><dt>Urgent order issue</dt><dd>Prioritized by the support team</dd></div><div><dt>General support</dt><dd>Reviewed during operating hours</dd></div><div><dt>Custom request</dt><dd>May require availability and feasibility review</dd></div></dl></section>
           <section className="support-guidance-card"><ShieldCheck /><p className="eyebrow">Privacy and safety</p><p>Contact information, payment details, and private customer data are kept inside the support process and are not displayed publicly.</p></section>
