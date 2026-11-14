@@ -59,6 +59,8 @@ export default function HomePage() {
 
       <HomeAdBanner />
 
+      <div className="site-container trust-grid"><div><BadgeCheck /><strong>Clear listing details</strong><span>Specifications, units and availability</span></div><div><Truck /><strong>Delivery that fits</strong><span><BrandName /> and courier fulfilment</span></div><div><PackageCheck /><strong>Support after ordering</strong><span>Tracking, invoices and returns</span></div></div>
+
       <section className="home-section stories-section">
         <div className="site-container stories-layout">
           <article className="testimonial-card"><Quote /><blockquote>“The best marketplace should make agricultural buying feel clear, dependable and close to home.”</blockquote><p>— The idea behind <BrandName /></p></article>
